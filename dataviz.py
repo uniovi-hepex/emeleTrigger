@@ -8,5 +8,6 @@ else:
         print('File already exists in data/')
 
 
-events = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree')
-print(events.typenames())
+branches = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree').arrays(library='pd')
+
+print(branches.head())
