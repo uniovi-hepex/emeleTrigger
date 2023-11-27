@@ -2,3 +2,5 @@
 *~
 # Rootfiles
 *.root
+# Pycache caca
+__pycache__
