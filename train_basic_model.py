@@ -65,25 +65,23 @@ def convert_to_point_cloud(branches):
 def generate_hdf5_dataset_with_padding(branches, hdf5_filename):
 
     # Padding
-    padded_branches=pad_branches(branches)  
+    padded_branches=np.asarray(pad_branches(branches))
+
+    print('Padded branches type', type(padded_branches))
+    point_clouds = convert_to_point_cloud(branches)
+    point_cloud_array = point_clouds.points.values
+    #f.create_dataset('point_clouds', data=np.asarray(point_clouds))
+    
+    numeric_branches = [
+        [float(subitem) if isinstance(subitem, (int, np.int_, np.uint)) else subitem for subitem in item]
+        for item in padded_branches
+    ]
+    #padded_branches = pad_sequences(numeric_branches, padding='post', dtype='float64', maxlen=max(len(seq) for seq in numeric_branches))
+    print(numeric_branches)
+    
     with h5py.File(hdf5_filename, 'w') as f:
-        point_clouds = convert_to_point_cloud(branches)
-        point_cloud_array = point_clouds.points.values
-        #f.create_dataset('point_clouds', data=np.asarray(point_clouds))
-        non_numeric_values = set()
-
-        for item in branches:
-            for subitem in item:
-                if not isinstance(subitem, (int, float, np.uint)):
-                    non_numeric_values.add(subitem)
-
-        print("Non-numeric values:", non_numeric_values)
-        numeric_branches = [
-            [float(subitem) if isinstance(subitem, (int, np.int_, np.uint)) else subitem for subitem in item]
-            for item in branches
-        ]
-        padded_branches = pad_sequences(numeric_branches, padding='post', dtype='float64')
-        f.create_dataset('images', data= np.asarray(padded_branches, dtype=np.float64))
+        #f.create_dataset('images', data= np.asarray(padded_branches.values, dtype=np.float64))
+        f.create_dataset('images', data= numeric_branches, dtype=np.float64)
         f.create_dataset('point_clouds', data=point_cloud_array)
 
         
