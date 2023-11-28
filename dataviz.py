@@ -8,5 +8,7 @@ def get_test_data():
     else:
         print('File already exists in data/')
 
-    branches = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree').arrays(library='pd')
+    branches = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree')
+    print(branches.show())
+    branches=branches.arrays(library='pd')
     return branches

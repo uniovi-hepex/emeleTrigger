@@ -1,6 +1,18 @@
 from dataviz import get_test_data
 import torch
 import torch.nn as nn
+
+import tensorflow_io as tfio
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+import pandas as pd
+import numpy as np
+from pyntcloud import PyntCloud
+
+# viz
+import networkx as nx
+import matplotlib.pyplot as plt
+
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 #import torch.nn.functional as F
@@ -9,9 +21,212 @@ from torch.utils.data import DataLoader
 #import matplotlib
 
 
+# Stuff that will go in a library
+def visualize_graph(G, color):
+    plt.figure(figsize=(10,10))
+    plt.xticks([])
+    plt.yticks([])
+    nx.draw_networkx(G, pos=nx.spring_layout(G, seed=43), with_labels=False,
+                     node_color=color, cmap='Set2')
+    plt.show()
+
+
+
+# End of stuff that will go in a library
+
+
+
+
+# Convert the dataset into a point cloud dataset
+import h5py
+
+# Define a function to pad a list with zeros
+def pad_list(lst, max_list_length):
+    return lst + [0] * (max_list_length - len(lst))
+
+def pad_branches(df):
+    max_list_length = df.applymap(lambda x: len(x) if isinstance(x, list) else 0).max().max()
+    # Apply the padding function to all columns containing lists
+    for col in df.columns:
+        df[col] = df[col].apply(lambda x: pad_list(x, max_list_length) if isinstance(x, list) else x)
+    return df
+
+
+def convert_to_point_cloud(branches):
+
+    #point_cloud_data = branches.copy()
+    point_cloud_data = branches[['muonPt', 'muonEta', 'muonPhi']].copy()
+    point_cloud_data.columns = ['x', 'y', 'z']
+    # Create a PyntCloud object from the DataFrame
+    cloud = PyntCloud(pd.DataFrame(point_cloud_data))
+
+    return cloud
+
+def generate_hdf5_dataset_with_padding(branches, hdf5_filename):
+
+    # Padding
+    padded_branches=pad_branches(branches)  
+    with h5py.File(hdf5_filename, 'w') as f:
+        point_clouds = convert_to_point_cloud(branches)
+        point_cloud_array = point_clouds.points.values
+        #f.create_dataset('point_clouds', data=np.asarray(point_clouds))
+        non_numeric_values = set()
+
+        for item in branches:
+            for subitem in item:
+                if not isinstance(subitem, (int, float, np.uint)):
+                    non_numeric_values.add(subitem)
+
+        print("Non-numeric values:", non_numeric_values)
+        numeric_branches = [
+            [float(subitem) if isinstance(subitem, (int, np.int_, np.uint)) else subitem for subitem in item]
+            for item in branches
+        ]
+        padded_branches = pad_sequences(numeric_branches, padding='post', dtype='float64')
+        f.create_dataset('images', data= np.asarray(padded_branches, dtype=np.float64))
+        f.create_dataset('point_clouds', data=point_cloud_array)
+
+        
+    # If looping on branches...
+    #with h5py.File(hdf5_filename, 'w') as f:
+    #    point_clouds = []
+    #    print('Shape of branches', padded_branches.shape)
+    #    for ievt, evt in padded_branches.iterrows():
+    #        points=np.asarray(evt)
+    #        point_clouds.append(points)
+    #    print('Max size is', max_size, ', now padding...')
+    #
+    #    f.create_dataset('point_clouds', data=np.asarray(point_clouds))
+
+
+
+# Do we need normalization?
+def resize_and_format_data(points, image):
+    pass
+
+
+
+def get_training_dataset(hdf5_path):
+    # Get the point clouds
+    x_train = tfio.IODataset.from_hdf5(hdf5_path, dataset='/point_clouds')
+    # Get the original points
+    y_train = tfio.IODataset.from_hdf5(hdf5_path, dataset='/images')
+    # Zip them to create pairs
+    training_dataset = tf.data.Dataset.zip((x_train,y_train))
+    # Apply the data transformations
+    training_dataset = training_dataset.map(resize_and_format_data)
+    
+    # Shuffle, prepare batches, etc ...
+    training_dataset = training_dataset.shuffle(100, reshuffle_each_iteration=True)
+    training_dataset = training_dataset.batch(BATCH_SIZE)
+    training_dataset = training_dataset.repeat()
+    training_dataset = training_dataset.prefetch(-1)
+    
+    # Return dataset
+    return training_dataset
+
+
+
+# Get data
 branches = get_test_data()
 
 print(branches.head())
+
+generate_hdf5_dataset_with_padding(branches, 'point_clouds.hd5')
+
+
+get_training_dataset('point_clouds.hd5')
+
+
+print(branches.head())
+print('Dumped to hdf5 dataset')
+
+
+from torch_geometric.datasets import KarateClub
+dataset= KarateClub()
+
+print('Explore dataset')
+print(f'Number of graphs in the dataset: {len(dataset)}')
+print(f'Number of features: {dataset.num_features}') #Number of features each node in the dataset has
+print(f'Number of classes: {dataset.num_classes}') #Number of classes that a node can be classified into
+
+
+#Since we have one graph in the dataset, we will select the graph and explore it's properties
+
+data = dataset[0]
+print('Graph properties')
+print('==============================================================')
+
+# Gather some statistics about the graph.
+print(f'Number of nodes: {data.num_nodes}') #Number of nodes in the graph
+print(f'Number of edges: {data.num_edges}') #Number of edges in the graph
+print(f'Average node degree: {data.num_edges / data.num_nodes:.2f}') # Average number of nodes in the graph
+print(f'Contains isolated nodes: {data.has_isolated_nodes()}') #Does the graph contains nodes that are not connected
+print(f'Contains self-loops: {data.has_self_loops()}') #Does the graph contains nodes that are linked to themselves
+print(f'Is undirected: {data.is_undirected()}') #Is the graph an undirected graph
+
+
+
+from torch_geometric.utils import to_networkx
+
+G = to_networkx(data, to_undirected=True)
+visualize_graph(G, color=data.y)
+
+
+from torch.nn import Linear
+from torch_geometric.nn import GCNConv
+
+
+class GCN(torch.nn.Module):
+    def __init__(self):
+        super(GCN, self).__init__()
+        torch.manual_seed(12345)
+        self.conv1 = GCNConv(dataset.num_features, 4)
+        self.conv2 = GCNConv(4, 4)
+        self.conv3 = GCNConv(4, 2)
+        self.classifier = Linear(2, dataset.num_classes)
+
+    def forward(self, x, edge_index):
+        h = self.conv1(x, edge_index)
+        h = h.tanh()
+        h = self.conv2(h, edge_index)
+        h = h.tanh()
+        h = self.conv3(h, edge_index)
+        h = h.tanh()  # Final GNN embedding space.
+        
+        # Apply a final (linear) classifier.
+        out = self.classifier(h)
+
+        return out, h
+
+model = GCN()
+print(model)
+
+
+
+
+model = GCN()
+criterion = torch.nn.CrossEntropyLoss()  #Initialize the CrossEntropyLoss function.
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)  # Initialize the Adam optimizer.
+
+def train(data):
+    optimizer.zero_grad()  # Clear gradients.
+    out, h = model(data.x, data.edge_index)  # Perform a single forward pass.
+    loss = criterion(out[data.train_mask], data.y[data.train_mask])  # Compute the loss solely based on the training nodes.
+    loss.backward()  # Derive gradients.
+    optimizer.step()  # Update parameters based on gradients.
+    return loss, h
+
+for epoch in range(401):
+    loss, h = train(data)
+    print(f'Epoch: {epoch}, Loss: {loss}')
+   
+
+
+visualize_graph(model, color=data.y)
+
+
+
 
 # What comes below mostly still doesn't make any sense---we don't want to do supervised learning here.
 
@@ -30,7 +245,7 @@ class OMTFDataset(Dataset):
 batch_size=512
 
 
-X_train, X_test, y_train, y_test = train_test_split(branches, branches, test_size=0.33)"
+X_train, X_test, y_train, y_test = train_test_split(branches, branches, test_size=0.33)
 
 train_dataset = OMTFDataset(X_train, y_train)
 test_dataset = OMTFDataset(X_test, y_test)
