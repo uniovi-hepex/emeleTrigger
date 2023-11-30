@@ -46,9 +46,13 @@ def pad_list(lst, max_list_length):
 
 def pad_branches(df):
     max_list_length = df.applymap(lambda x: len(x) if isinstance(x, list) else 0).max().max()
+    max_int_list_length = df.applymap(lambda x: np.max([len(y) if isinstance(y, list) else 0 for y in x].append(0)) if isinstance(x, list) else 0).max().max() # lolazo
     # Apply the padding function to all columns containing lists
     for col in df.columns:
         df[col] = df[col].apply(lambda x: pad_list(x, max_list_length) if isinstance(x, list) else x)
+        df[col] = df[col].apply(lambda x: [  pad_list(y, max_int_list_length) if isinstance(y, list) else y for y in x] if isinstance(x, list) else x)
+        for stuff in df[col]:
+                print("Stuff: ", len(stuff) if isinstance(stuff, list) else type(stuff))
     return df
 
 
@@ -65,23 +69,23 @@ def convert_to_point_cloud(branches):
 def generate_hdf5_dataset_with_padding(branches, hdf5_filename):
 
     # Padding
-    padded_branches=np.asarray(pad_branches(branches))
+    padded_branches=np.asarray(pad_branches(branches), dtype=np.float64)
 
-    print('Padded branches type', type(padded_branches))
     point_clouds = convert_to_point_cloud(branches)
     point_cloud_array = point_clouds.points.values
     #f.create_dataset('point_clouds', data=np.asarray(point_clouds))
     
-    numeric_branches = [
-        [float(subitem) if isinstance(subitem, (int, np.int_, np.uint)) else subitem for subitem in item]
-        for item in padded_branches
-    ]
+    print('Padded branches type', type(padded_branches))
+    #padded_branches=padded_branches.astype(np.float64)
+    #numeric_branches = [
+    #    [float(subitem) if isinstance(subitem, (int, np.int_, np.uint)) else subitem for subitem in item]
+    #    for item in padded_branches
+    #    ]
     #padded_branches = pad_sequences(numeric_branches, padding='post', dtype='float64', maxlen=max(len(seq) for seq in numeric_branches))
-    print(numeric_branches)
-    
+
     with h5py.File(hdf5_filename, 'w') as f:
         #f.create_dataset('images', data= np.asarray(padded_branches.values, dtype=np.float64))
-        f.create_dataset('images', data= numeric_branches, dtype=np.float64)
+        f.create_dataset('images', data= padded_branches, dtype=np.float64)
         f.create_dataset('point_clouds', data=point_cloud_array)
 
         
