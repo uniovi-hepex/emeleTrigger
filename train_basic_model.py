@@ -5,6 +5,7 @@ import torch.nn as nn
 import awkward as ak
 import copy
 
+import tensorflow as tf
 import tensorflow_io as tfio
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
@@ -108,7 +109,27 @@ def resize_and_format_data(points, image):
 
 
 
-def get_training_dataset(hdf5_path):
+#def get_training_dataset(hdf5_path, BATCH_SIZE=128):
+#
+#    with h5py.File(hdf5_path, 'r') as f:
+#        # Assume 'your_dataset' is the name of the dataset in the HDF5 file
+#        x_train = f['/point_clouds']
+#        y_train = f['/images']
+#        # Convert the h5py dataset to a TensorFlow dataset
+#        x_train = tf.data.Dataset.from_tensor_slices(x_train)
+#        y_train = tf.data.Dataset.from_tensor_slices(y_train)
+#        # Zip them to create pairs
+#        training_dataset = tf.data.Dataset.zip((x_train,y_train))
+#        
+#        # Shuffle, prepare batches, etc ...
+#        training_dataset = training_dataset.shuffle(100, reshuffle_each_iteration=True)
+#        training_dataset = training_dataset.batch(BATCH_SIZE)
+#        training_dataset = training_dataset.repeat()
+#        training_dataset = training_dataset.prefetch(-1)
+#        
+#        return training_dataset
+    
+def get_training_dataset(hdf5_path, BATCH_SIZE=128):
     # Get the point clouds
     x_train = tfio.IODataset.from_hdf5(hdf5_path, dataset='/point_clouds')
     # Get the original points
@@ -116,7 +137,7 @@ def get_training_dataset(hdf5_path):
     # Zip them to create pairs
     training_dataset = tf.data.Dataset.zip((x_train,y_train))
     # Apply the data transformations
-    training_dataset = training_dataset.map(resize_and_format_data)
+    #training_dataset = training_dataset.map(resize_and_format_data)
     
     # Shuffle, prepare batches, etc ...
     training_dataset = training_dataset.shuffle(100, reshuffle_each_iteration=True)
@@ -134,20 +155,20 @@ def get_training_dataset(hdf5_path):
 #print(branches.head())
 
 
-if False:
+if True:
     branches = get_test_data('ak')
     generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 
 
 dataset = get_training_dataset('data/point_clouds.hd5')
 
-
+print("Dataset is ", dataset)
 #print(branches.head())
 #print('Dumped to hdf5 dataset')
 
 
 print('Explore dataset')
-print(f'Number of graphs in the dataset: {len(dataset)}')
+#print(f'Number of graphs in the dataset: {len(dataset)}')
 print(f'Number of features: {dataset.num_features}') #Number of features each node in the dataset has
 print(f'Number of classes: {dataset.num_classes}') #Number of classes that a node can be classified into
 
