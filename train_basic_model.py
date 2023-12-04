@@ -2,6 +2,9 @@ from dataviz import get_test_data
 import torch
 import torch.nn as nn
 
+import awkward as ak
+import copy
+
 import tensorflow_io as tfio
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
@@ -51,29 +54,79 @@ def pad_branches(df):
     for col in df.columns:
         df[col] = df[col].apply(lambda x: pad_list(x, max_list_length) if isinstance(x, list) else x)
         df[col] = df[col].apply(lambda x: [  pad_list(y, max_int_list_length) if isinstance(y, list) else y for y in x] if isinstance(x, list) else x)
-        for stuff in df[col]:
-                print("Stuff: ", len(stuff) if isinstance(stuff, list) else type(stuff))
+        #for stuff in df[col]:
+        #        print("Stuff: ", len(stuff) if isinstance(stuff, list) else type(stuff))
     return df
 
 
 def convert_to_point_cloud(branches):
 
     #point_cloud_data = branches.copy()
-    point_cloud_data = branches[['muonPt', 'muonEta', 'muonPhi']].copy()
-    point_cloud_data.columns = ['x', 'y', 'z']
+    #point_cloud_data = copy.deepcopy(branches[['muonPt', 'muonEta', 'muonPhi']])
+    point_cloud_data = {'x': branches['muonPt'], 'y': branches['muonEta'], 'z': branches['muonPhi']} # down the line maybe convert to actual cartesian coordinates
     # Create a PyntCloud object from the DataFrame
     cloud = PyntCloud(pd.DataFrame(point_cloud_data))
 
     return cloud
 
-def generate_hdf5_dataset_with_padding(branches, hdf5_filename):
+def generate_hdf5_dataset_with_padding(branches, hdf5_filename, save=False):
 
-    # Padding
-    padded_branches=np.asarray(pad_branches(branches), dtype=np.float64)
+    # Padding   
+    #padded_branches=np.asarray(pad_branches(branches))
+    # Padding and flattening
+    #padded_branches=ak.fill_none(ak.pad_none(branches, 2, clip=True), 999)
+    padded_branches=ak.to_dataframe(branches)
 
+    #padded_branches=branches.pad(longest, clip=True).fillna(0).regular()
+    #for name in padded_branches:
+    #    print('name', name)
+    #    print('counts', padded_branches[name])
+    #    #longest = padded_branches[name].counts.max()
+    #    padded_branches[name] = padded_branches[name].pad(longest).fillna(0).regular()
+    
+    #padded_branches = branches.pad(branches.counts.max()).fillna(0)
+    
     point_clouds = convert_to_point_cloud(branches)
     point_cloud_array = point_clouds.points.values
+
+    #print("SHAPE", padded_branches.shape)
+    #print("Columns shape")
+    #for i in range(39):
+    #    if isinstance(padded_branches[0,i], list):
+    #        print('List of ', type(padded_branches[0,i][0]))
+    #    else:
+    #        print(type(padded_branches[0,i]))
+                    
     #f.create_dataset('point_clouds', data=np.asarray(point_clouds))
+    #dt = np.dtype([('id', 'i4'), ('time', 'f4'), ('matrix', 'f4', (10, 2))])
+    #compound_dtype = np.dtype([
+    #    ('int_col1', 'i4'), ('int_col2', 'i4'),
+    #    ('float_col1', 'f8'), ('float_col2', 'f8'),
+    #    ('bool_col1', 'bool'), ('bool_col2', 'bool')
+    #])
+    #
+    #compound_dtype = np.dtype([
+    #('col1', 'i4'), ('col2', 'i4'),
+    #('col3', 'f8'), ('col4', 'f8'),
+    #('col5', 'f8'), ('col6', 'f8'),
+    #('col7', 'f8'), ('col8', 'i4'),
+    #('col9', 'f8'), ('col10', 'f8'),
+    #('col11', 'f8'), ('col12', 'f8'),
+    #('col13', 'f8'), ('col14', 'f8'),
+    #('col15', 'i4'), ('col16', 'i4'),
+    #('col17', 'i4'), ('col18', 'i4'),
+    #('col19', 'i4'), ('col20', 'i4'),
+    #('col21', 'i4'), ('col22', 'i4'),
+    #('col23', 'i4'), ('col24', 'i4'),
+    #('col25', 'i4'), ('col26', 'i4'),
+    #('col27', 'i4'), ('col28', 'i4'),
+    #('col29', 'i4'), ('col30', 'i4'),
+    #('col31', 'f8'), ('col32', 'f8'),
+    #('col33', 'i4'), ('col34', 'i4'),
+    #('col35', 'i4'), ('col36', 'i4'),
+    #('col37', 'i4'), ('col38', 'i4'),
+    #('col39', 'f8'),
+    #])
     
     print('Padded branches type', type(padded_branches))
     #padded_branches=padded_branches.astype(np.float64)
@@ -84,8 +137,9 @@ def generate_hdf5_dataset_with_padding(branches, hdf5_filename):
     #padded_branches = pad_sequences(numeric_branches, padding='post', dtype='float64', maxlen=max(len(seq) for seq in numeric_branches))
 
     with h5py.File(hdf5_filename, 'w') as f:
+
         #f.create_dataset('images', data= np.asarray(padded_branches.values, dtype=np.float64))
-        f.create_dataset('images', data= padded_branches, dtype=np.float64)
+        f.create_dataset('images', data=padded_branches, dtype=np.float64)
         f.create_dataset('point_clouds', data=point_cloud_array)
 
         
@@ -130,18 +184,18 @@ def get_training_dataset(hdf5_path):
 
 
 # Get data
-branches = get_test_data()
+#branches = get_test_data('pd')
+#print(branches.head())
+branches = get_test_data('ak')
 
-print(branches.head())
-
-generate_hdf5_dataset_with_padding(branches, 'point_clouds.hd5')
-
-
-get_training_dataset('point_clouds.hd5')
+generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 
 
-print(branches.head())
-print('Dumped to hdf5 dataset')
+#get_training_dataset('point_clouds.hd5')
+
+
+#print(branches.head())
+#print('Dumped to hdf5 dataset')
 
 
 from torch_geometric.datasets import KarateClub
