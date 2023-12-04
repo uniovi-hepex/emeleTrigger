@@ -37,9 +37,6 @@ def visualize_graph(G, color):
 
 # End of stuff that will go in a library
 
-
-
-
 # Convert the dataset into a point cloud dataset
 import h5py
 
@@ -97,63 +94,12 @@ def generate_hdf5_dataset_with_padding(branches, hdf5_filename, save=False):
     #    else:
     #        print(type(padded_branches[0,i]))
                     
-    #f.create_dataset('point_clouds', data=np.asarray(point_clouds))
-    #dt = np.dtype([('id', 'i4'), ('time', 'f4'), ('matrix', 'f4', (10, 2))])
-    #compound_dtype = np.dtype([
-    #    ('int_col1', 'i4'), ('int_col2', 'i4'),
-    #    ('float_col1', 'f8'), ('float_col2', 'f8'),
-    #    ('bool_col1', 'bool'), ('bool_col2', 'bool')
-    #])
-    #
-    #compound_dtype = np.dtype([
-    #('col1', 'i4'), ('col2', 'i4'),
-    #('col3', 'f8'), ('col4', 'f8'),
-    #('col5', 'f8'), ('col6', 'f8'),
-    #('col7', 'f8'), ('col8', 'i4'),
-    #('col9', 'f8'), ('col10', 'f8'),
-    #('col11', 'f8'), ('col12', 'f8'),
-    #('col13', 'f8'), ('col14', 'f8'),
-    #('col15', 'i4'), ('col16', 'i4'),
-    #('col17', 'i4'), ('col18', 'i4'),
-    #('col19', 'i4'), ('col20', 'i4'),
-    #('col21', 'i4'), ('col22', 'i4'),
-    #('col23', 'i4'), ('col24', 'i4'),
-    #('col25', 'i4'), ('col26', 'i4'),
-    #('col27', 'i4'), ('col28', 'i4'),
-    #('col29', 'i4'), ('col30', 'i4'),
-    #('col31', 'f8'), ('col32', 'f8'),
-    #('col33', 'i4'), ('col34', 'i4'),
-    #('col35', 'i4'), ('col36', 'i4'),
-    #('col37', 'i4'), ('col38', 'i4'),
-    #('col39', 'f8'),
-    #])
-    
     print('Padded branches type', type(padded_branches))
-    #padded_branches=padded_branches.astype(np.float64)
-    #numeric_branches = [
-    #    [float(subitem) if isinstance(subitem, (int, np.int_, np.uint)) else subitem for subitem in item]
-    #    for item in padded_branches
-    #    ]
-    #padded_branches = pad_sequences(numeric_branches, padding='post', dtype='float64', maxlen=max(len(seq) for seq in numeric_branches))
 
     with h5py.File(hdf5_filename, 'w') as f:
-
         #f.create_dataset('images', data= np.asarray(padded_branches.values, dtype=np.float64))
         f.create_dataset('images', data=padded_branches, dtype=np.float64)
         f.create_dataset('point_clouds', data=point_cloud_array)
-
-        
-    # If looping on branches...
-    #with h5py.File(hdf5_filename, 'w') as f:
-    #    point_clouds = []
-    #    print('Shape of branches', padded_branches.shape)
-    #    for ievt, evt in padded_branches.iterrows():
-    #        points=np.asarray(evt)
-    #        point_clouds.append(points)
-    #    print('Max size is', max_size, ', now padding...')
-    #
-    #    f.create_dataset('point_clouds', data=np.asarray(point_clouds))
-
 
 
 # Do we need normalization?
@@ -186,20 +132,19 @@ def get_training_dataset(hdf5_path):
 # Get data
 #branches = get_test_data('pd')
 #print(branches.head())
-branches = get_test_data('ak')
-
-generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 
 
-#get_training_dataset('point_clouds.hd5')
+if False:
+    branches = get_test_data('ak')
+    generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
+
+
+dataset = get_training_dataset('data/point_clouds.hd5')
 
 
 #print(branches.head())
 #print('Dumped to hdf5 dataset')
 
-
-from torch_geometric.datasets import KarateClub
-dataset= KarateClub()
 
 print('Explore dataset')
 print(f'Number of graphs in the dataset: {len(dataset)}')
