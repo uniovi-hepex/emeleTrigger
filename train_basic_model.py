@@ -5,8 +5,11 @@ import torch.nn as nn
 import awkward as ak
 import copy
 
+import os
+
 import tensorflow as tf
 import tensorflow_io as tfio
+import tensorflow_datasets as tfds
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 import pandas as pd
@@ -17,13 +20,15 @@ from pyntcloud import PyntCloud
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from torch.utils.data import Dataset
+#from torch.utils.data import Dataset
+from torch_geometric.data import Dataset
 from torch.utils.data import DataLoader
 #import torch.nn.functional as F
 #from sklearn.model_selection import train_test_split
 #import matplotlib.pyplot as plt
 #import matplotlib
 
+from itertools import combinations
 
 # Stuff that will go in a library
 def visualize_graph(G, color):
@@ -66,6 +71,7 @@ def convert_to_point_cloud(branches):
     cloud = PyntCloud(pd.DataFrame(point_cloud_data))
 
     return cloud
+
 
 def generate_hdf5_dataset_with_padding(branches, hdf5_filename, save=False):
 
@@ -128,8 +134,67 @@ def resize_and_format_data(points, image):
 #        training_dataset = training_dataset.prefetch(-1)
 #        
 #        return training_dataset
+
+
+from torch_geometric.data import Dataset, Data
+
+class OMTFDataset(Dataset):
+    def __init__(self, root, filename, transform=None, pre_transform=None, pre_filter=None):
+        self.filename=filename
+        super().__init__(root, transform, pre_transform, pre_filter)
+        
+    @property
+    def raw_file_names(self):
+        return self.filename
+
+    @property
+    def processed_file_names(self):
+        return [f'torchdata_{idx}.pt' for idx in range(len(self.raw_paths)) ]
+
+    def download(self):
+        pass
+
+    def process(self):
+        idx = 0
+
+        for raw_path in self.raw_paths:
+            # Read data from `raw_path`.
+
+
+            # HUGE MISTAKE. I NEED TO HAVE ONE GRAPH PER EVENT.
+            datafile= h5py.File(raw_path,'r')
+            # Get the point clouds
+            node_feats = datafile['point_clouds'][()]
+            G = nx.Graph()
+            G.add_nodes_from(node_feats)
+            # Get the original points
+            node_labels = datafile['images'][()]
+            print(node_feats)
+            edge_index = [list(combinations(x, 2)) for x in node_feats]
+            print("There are edges", len(edge_index[0]))
+            data = Data(x=node_feats,edge_index=edge_index,y=node_labels)
+
+            if self.pre_filter is not None and not self.pre_filter(data):
+                continue
+
+            if self.pre_transform is not None:
+                data = self.pre_transform(data)
+
+            torch.save(data, os.path.join(self.processed_dir, f'torchdata_{idx}.pt'))
+            idx += 1
+
+    def len(self):
+        return len(self.processed_file_names)
+
+    def get(self, idx):
+        data = torch.load(os.path.join(self.processed_dir, f'torchdata_{idx}.pt'))
+        return data
+
+
     
 def get_training_dataset(hdf5_path, BATCH_SIZE=128):
+
+
     # Get the point clouds
     x_train = tfio.IODataset.from_hdf5(hdf5_path, dataset='/point_clouds')
     # Get the original points
@@ -154,26 +219,123 @@ def get_training_dataset(hdf5_path, BATCH_SIZE=128):
 #branches = get_test_data('pd')
 #print(branches.head())
 
-
-if True:
+br=get_test_data('pd')
+pd.set_option('display.max_columns', None)
+print(br.head())
+quit()
+if False:
     branches = get_test_data('ak')
     generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 
 
-dataset = get_training_dataset('data/point_clouds.hd5')
+#dataset = get_training_dataset('data/point_clouds.hd5')
 
-print("Dataset is ", dataset)
-#print(branches.head())
-#print('Dumped to hdf5 dataset')
 
+
+# Create a list to store individual graphs
+graphs = []
+
+# Iterate through each event and create a graph
+for index, row in branches.iterrows():
+    # Create a directed graph for each event
+    graph = nx.DiGraph()
+    
+    # Add nodes with attributes
+    node_attributes = row.to_dict()
+    graph.add_node(index, **node_attributes)
+    
+    # Add the graph to the list
+    graphs.append(graph)
+
+####################################
+# So, what I do below is basically wrong, in the sense that it runs, but it doesn-t contain the edges structure that would be needed.
+# Therefore, here would go the code that creates the edges structure
+# A sample code (for the tracker) is here>  https://github.com/CMS-GNN-Tracking-Hackathon-2021/interaction-network/blob/main/graph_construction/build_graph.py ,
+# where they define the allowed edges between the various parts of the tracker, in their case
+####################
+
+    
+# Assume your graph has node features and labels
+# You should replace this with your actual node features and labels
+node_features = torch.randn((num_nodes, num_features))  # Replace with your actual features
+node_labels = torch.randint(0, num_classes, (num_nodes,))  # Replace with your actual labels
+
+# Convert each NetworkX graph to a PyTorch Geometric Data object
+data_list = []
+for graph in list_of_networkx_graphs:
+    # Extract node features and labels
+    node_features = graph.nodes(data='features')
+    node_labels = graph.nodes(data='label')
+
+    # Convert to PyTorch tensors
+    x = torch.tensor([node['features'] for node in node_features], dtype=torch.float32)
+    y = torch.tensor([node['label'] for node in node_labels], dtype=torch.long)
+
+    # Assuming your graph has edges
+    edge_index = torch.tensor(list(graph.edges), dtype=torch.long).t().contiguous()
+
+    # Create a PyTorch Geometric Data object
+    data = Data(x=x, edge_index=edge_index, y=y)
+
+    data_list.append(data)
+
+# Create a DataLoader
+train_loader = DataLoader(data_list, batch_size=batch_size, shuffle=True)
+
+# Define a simple GNN model
+class SimpleGNN(nn.Module):
+    def __init__(self, in_channels, out_channels, num_classes):
+        super(SimpleGNN, self).__init__()
+        self.conv1 = GCNConv(in_channels, out_channels)
+        self.conv2 = GCNConv(out_channels, num_classes)
+
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+        x = self.conv1(x, edge_index)
+        x = self.conv2(x, edge_index)
+        return x
+
+# Instantiate the model, loss function, and optimizer
+model = SimpleGNN(in_channels=num_features, out_channels=16, num_classes=num_classes)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Training loop
+num_epochs = 10
+for epoch in range(num_epochs):
+    for data in train_loader:
+        optimizer.zero_grad()
+        out = model(data)
+        loss = criterion(out, data.y)
+        loss.backward()
+        optimizer.step()
+
+dataset = OMTFDataset("data/", "point_clouds.hd5")
+
+
+inspectDataset=False
+
+if inspectDataset:
+    print(dataset)
+    for image, label in tfds.as_numpy(dataset):
+        print(type(image), type(label), label)
 
 print('Explore dataset')
-#print(f'Number of graphs in the dataset: {len(dataset)}')
-print(f'Number of features: {dataset.num_features}') #Number of features each node in the dataset has
-print(f'Number of classes: {dataset.num_classes}') #Number of classes that a node can be classified into
+print(f'Number of graphs in the dataset: {len(dataset)}')
+print(f'Number of features: {dataset.num_features}')
+#print(f'Number of classes: {dataset.num_classes}')
 
 
-#Since we have one graph in the dataset, we will select the graph and explore it's properties
+#from torch_geometric.transforms import KNNGraph
+#import torch_geometric
+#
+#dataset.transform = torch_geometric.transforms.Compose([dataset, KNNGraph(k=6)])
+#
+##Since we have one graph in the dataset, we will select the graph and explore it's properties
+#print(dataset.transform)
+
+
+
 
 data = dataset[0]
 print('Graph properties')
@@ -253,18 +415,6 @@ visualize_graph(model, color=data.y)
 # What comes below mostly still doesn't make any sense---we don't want to do supervised learning here.
 
 
-# Maybe not needed (or move to get_test_data)
-class OMTFDataset(Dataset):
-    def __init__(self, X, y):
-        self.X = torch.Tensor(X)
-        self.y = torch.Tensor(y)
-    def __len__(self):
-        return len(self.y)
-    def __getitem__(self, idx):
-        label = self.y[idx]
-        datum = self.X[idx]
-        return datum, label
-batch_size=512
 
 
 X_train, X_test, y_train, y_test = train_test_split(branches, branches, test_size=0.33)
