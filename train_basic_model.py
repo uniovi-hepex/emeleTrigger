@@ -19,7 +19,7 @@ from pyntcloud import PyntCloud
 import networkx as nx
 import matplotlib.pyplot as plt
 
-
+from torch_geometric.utils.convert import from_networkx
 
 # Do we need normalization?
 def resize_and_format_data(points, image):
@@ -49,7 +49,8 @@ def convert_to_point_cloud(arr):
         if not ( len(arr['stubR'][index])==len(arr['stubEta'][index]) and len(arr['stubEta'][index])==len(arr['stubPhi'][index])):
             print('HUGE PROBLEM, sizes not match: R,eta,phi ', len(arr['stubR'][index]), len(arr['stubEta'][index]), len(arr['stubPhi'][index]))
     for index, row in arr.iterrows():
-        pc = {'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi']} # down the line maybe convert to actual cartesian coordinates
+        # Here now I need to enrich this with the stublogiclayer etc, for the edges
+        pc = {'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi'], 'stubLogicLayer': row['stubLogicLayer']} # down the line maybe convert to actual cartesian coordinates
         # Create a PyntCloud object from the DataFrame
         if len(pc['x'])==0:
             continue
@@ -81,27 +82,56 @@ sky = convert_to_point_cloud(branches)
 # Create a list to store individual graphs
 graphs = []
 
+connectedLogicLayers=[(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
+
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
+    print('CLOUD POINTS', cloud.points)
+    for index, row in cloud.points.iterrows():
+        
+    # loop on cloud.points
+    # build edges based on stubLayer
     graph.add_nodes_from(cloud.points.T) # Must be the transpose, it reads by colum instead of by row
+    
     graphs.append(graph)
 
 
-gmax=None
-nmax=0
-for graph in graphs:
-  nn = graph.number_of_nodes()
-  if nn>nmax:
-      gmax=copy.deepcopy(graph)
-      nmax=nn
-nx.draw(gmax)
-
-plt.show()
+viz=True
+if viz:
+    gmax=None
+    nmax=0
+    for graph in graphs:
+        nn = graph.number_of_nodes()
+        if nn>nmax:
+            gmax=copy.deepcopy(graph)
+            nmax=nn
+    nx.draw(gmax, with_labels=True)
+    g=from_networkx(gmax)
+    print(g)
+    print(g.x)
+    print(g.y)
+    print(g.edge_index)
+    plt.show()
+    
 # Convert each NetworkX graph to a PyTorch Geometric Data object
+
+
+pg_graphs=[from_networkx(g) for g in graphs]
+
+
+pg=pg_graphs[22]
+print(pg)
+print(pg.x)
+print(pg.y)
+print(pg.edge_index)
+visualize_graph(pg, color=pg.y)
+
+quit()
+
 data_list = []
 for graph in graphs:
     # Extract node features and labels
-    print(graph)
+    print(graph, list(graph.nodes), list(graph.edges))
     print("FEATURES", graph.nodes(data='features'))
     print("LABELS", graph.nodes(data='labels'))
     node_features = graph.nodes(data='features')
