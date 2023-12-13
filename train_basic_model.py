@@ -32,6 +32,12 @@ br=get_test_data('pd')
 pd.set_option('display.max_columns', None)
 print(br.head())
 
+# Calculate deltaphis between layers, adding it to a new column
+# this will be our proxy to the magnetic field
+
+
+
+
 
 # Keep this
 #branches = get_test_data('ak')
