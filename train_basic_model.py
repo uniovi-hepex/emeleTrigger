@@ -1,4 +1,4 @@
-from utils import get_test_data, visualize_graph
+from utils import get_test_data, visualize_graph, get_stub_r
 import torch
 import torch.nn as nn
 
@@ -27,7 +27,7 @@ def resize_and_format_data(points, image):
 # Get data
 branches = get_test_data('pd')
 print(branches.head())
-
+print('dkfjshdkfjshdkfshdfjskdhsk', type(branches))
 #br=get_test_data('pd')
 #pd.set_option('display.max_columns', None)
 #print(br.head())
@@ -41,31 +41,11 @@ print(branches['stubDPhi'])
 #dataset = get_training_dataset('data/point_clouds.hd5')
 
 
-def _get_stub_r(stubTypes, stubDetIds, stubLogicLayers):
-
-    rs=[]
-    for stubType, stubDetId, stubLogicLayer in zip(stubTypes, stubDetIds, stubLogicLayers):
-        r=None
-        if stubType == 1: # DTs
-            if stubLogicLayer==0:
-                r= 431.133
-            elif stubLogicLayer==2:
-                r=512.401
-            elif stubLogicLayer==4:
-                r=617.946
-        elif stubType==2: # CSCs
-            r=999.
-        elif stubType>2: # RPCs, but they will be shut down because they leak poisonous gas
-            r=999.
-        rs.append(r)
-    return np.array(rs, dtype=object)
-
-v_get_stub_r = np.vectorize(_get_stub_r)
-
 def convert_to_point_cloud(arr):
 
-    arr['stubR'] = v_get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
+    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
 
+    print('converting to point cloud', arr['stubR'].shape, arr['stubEta'].shape, arr['stubPhi'].shape)
     # Next line won't work yet, need to flatten to have a point cloud that has each stub
     point_cloud_data = {'x': arr['stubR'], 'y': arr['stubEta'], 'z': arr['stubPhi']} # down the line maybe convert to actual cartesian coordinates
     # Create a PyntCloud object from the DataFrame

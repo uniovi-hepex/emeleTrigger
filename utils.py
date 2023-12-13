@@ -16,6 +16,30 @@ def foldPhi (phi):
 def phiRel(phi, processor):
     return phi - foldPhi(NUM_PHI_BINS / NUM_PROCESSORS * (processor) + NUM_PHI_BINS / 24)
 
+
+def _get_stub_r(stubTypes, stubDetIds, stubLogicLayers):
+
+    rs=[]
+    for stubType, stubDetId, stubLogicLayer in zip(stubTypes, stubDetIds, stubLogicLayers):
+        r=None
+        if stubType == 1: # DTs
+            if stubLogicLayer==0:
+                r= 431.133
+            elif stubLogicLayer==2:
+                r=512.401
+            elif stubLogicLayer==4:
+                r=617.946
+        elif stubType==2: # CSCs
+            r=999.
+        elif stubType>2: # RPCs, but they will be shut down because they leak poisonous gas
+            r=999.
+        rs.append(r)
+    if len(rs) != len(stubTypes):
+        print('Tragic tragedy. R has len', len(rs), ', stubs have len', len(stubTypes))
+    return np.array(rs, dtype=object)
+get_stub_r = np.vectorize(_get_stub_r)
+
+
 def get_test_data(library=None, mode=None):
 
     if mode=="old" and not os.path.isfile('data/omtfAnalysis2.root'):
