@@ -10,6 +10,8 @@ import os
 import h5py
 
 import pandas as pd
+from pandas.plotting import scatter_matrix
+
 import numpy as np
 from pyntcloud import PyntCloud
 
@@ -27,13 +29,9 @@ def resize_and_format_data(points, image):
 # Get data
 branches = get_test_data('pd')
 print(branches.head())
-print('dkfjshdkfjshdkfshdfjskdhsk', type(branches))
 #br=get_test_data('pd')
 #pd.set_option('display.max_columns', None)
 #print(br.head())
-
-print(branches['stubPhi'])
-print(branches['stubDPhi'])
 
 # Keep this
 #branches = get_test_data('ak')
@@ -45,18 +43,30 @@ def convert_to_point_cloud(arr):
 
     arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
 
-    print('converting to point cloud', arr['stubR'].shape, arr['stubEta'].shape, arr['stubPhi'].shape)
-    # Next line won't work yet, need to flatten to have a point cloud that has each stub
-    point_cloud_data = {'x': arr['stubR'], 'y': arr['stubEta'], 'z': arr['stubPhi']} # down the line maybe convert to actual cartesian coordinates
-    # Create a PyntCloud object from the DataFrame
-    cloud = PyntCloud(pd.DataFrame(point_cloud_data))
+    sky=[]
 
-    return cloud
+    for index, row in branches.iterrows():
+        if not ( len(arr['stubR'][index])==len(arr['stubEta'][index]) and len(arr['stubEta'][index])==len(arr['stubPhi'][index])):
+            print('HUGE PROBLEM, sizes not match: R,eta,phi ', len(arr['stubR'][index]), len(arr['stubEta'][index]), len(arr['stubPhi'][index]))
+    for index, row in branches.iterrows():
+        pc = {'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi']} # down the line maybe convert to actual cartesian coordinates
+        # Create a PyntCloud object from the DataFrame
+        if len(pc['x'])==0:
+            continue
+        cloud = PyntCloud(pd.DataFrame(pc))
+        sky.append(cloud)
+
+    return sky
 
 
-mycloud = convert_to_point_cloud(branches)
+sky = convert_to_point_cloud(branches)
 
-print(mycloud)
+print(sky[0].points.x)
+print(sky[0].points.describe())
+sky[0].points.boxplot()
+plt.show()
+scatter_matrix(sky[0].points, diagonal="kde", figsize=(8,8))
+plt.show()
 
 # Create a list to store individual graphs
 graphs = []
