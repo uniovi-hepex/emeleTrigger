@@ -45,10 +45,10 @@ def convert_to_point_cloud(arr):
 
     sky=[]
 
-    for index, row in branches.iterrows():
+    for index, row in arr.iterrows():
         if not ( len(arr['stubR'][index])==len(arr['stubEta'][index]) and len(arr['stubEta'][index])==len(arr['stubPhi'][index])):
             print('HUGE PROBLEM, sizes not match: R,eta,phi ', len(arr['stubR'][index]), len(arr['stubEta'][index]), len(arr['stubPhi'][index]))
-    for index, row in branches.iterrows():
+    for index, row in arr.iterrows():
         pc = {'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi']} # down the line maybe convert to actual cartesian coordinates
         # Create a PyntCloud object from the DataFrame
         if len(pc['x'])==0:
@@ -57,6 +57,16 @@ def convert_to_point_cloud(arr):
         sky.append(cloud)
 
     return sky
+
+def convert_to_point_cloud_bad(arr):
+
+    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
+
+    pc = {'x': arr['stubR'], 'y': arr['stubEta'], 'z': arr['stubPhi']} # down the line maybe convert to actual cartesian coordinates
+    print('THECLOUD', pc)
+    # Create a PyntCloud object from the DataFrame
+    cloud = PyntCloud(pd.DataFrame(pc))
+    return cloud
 
 
 sky = convert_to_point_cloud(branches)
@@ -73,22 +83,81 @@ graphs = []
 
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
+    print(index, cloud.points)
     node_attributes=cloud.points
-    graph.add_node(index, **node_attributes)
+    for i, na in enumerate(node_attributes):
+        graph.add_node(i, **na)
     graphs.append(graph)
 
 
-# Iterate through each event and create a graph
-for index, row in branches.iterrows():
-    # Create a directed graph for each event
-    graph = nx.DiGraph()
-    
-    # Add nodes with attributes
-    node_attributes = row.to_dict()
-    graph.add_node(index, **node_attributes)
-    
-    # Add the graph to the list
-    graphs.append(graph)
+nx.draw(graphs[0])
+
+plt.show()
+# Convert each NetworkX graph to a PyTorch Geometric Data object
+data_list = []
+for graph in graphs:
+    # Extract node features and labels
+    print(graph)
+    print("FEATURES", graph.nodes(data='features'))
+    print("LABELS", graph.nodes(data='labels'))
+    node_features = graph.nodes(data='features')
+    node_labels = graph.nodes(data='label')
+
+    # Convert to PyTorch tensors
+    x = torch.tensor([node['features'] for node in node_features], dtype=torch.float32)
+    y = torch.tensor([node['label'] for node in node_labels], dtype=torch.long)
+
+    # Assuming your graph has edges
+    edge_index = torch.tensor(list(graph.edges), dtype=torch.long).t().contiguous()
+
+    # Create a PyTorch Geometric Data object
+    data = Data(x=x, edge_index=edge_index, y=y)
+
+    data_list.append(data)
+
+# Create a DataLoader
+train_loader = DataLoader(data_list, batch_size=batch_size, shuffle=True)
+
+# Define a simple GNN model
+class SimpleGNN(nn.Module):
+    def __init__(self, in_channels, out_channels, num_classes):
+        super(SimpleGNN, self).__init__()
+        self.conv1 = GCNConv(in_channels, out_channels)
+        self.conv2 = GCNConv(out_channels, num_classes)
+
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+        x = self.conv1(x, edge_index)
+        x = self.conv2(x, edge_index)
+        return x
+
+# Instantiate the model, loss function, and optimizer
+model = SimpleGNN(in_channels=num_features, out_channels=16, num_classes=num_classes)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Training loop
+num_epochs = 10
+for epoch in range(num_epochs):
+    for data in train_loader:
+        optimizer.zero_grad()
+        out = model(data)
+        loss = criterion(out, data.y)
+        loss.backward()
+        optimizer.step()
+
+print("TRAINED")
+## Iterate through each event and create a graph
+#for index, row in branches.iterrows():
+#    # Create a directed graph for each event
+#    graph = nx.DiGraph()
+#    
+#    # Add nodes with attributes
+#    node_attributes = row.to_dict()
+#    graph.add_node(index, **node_attributes)
+#    
+#    # Add the graph to the list
+#    graphs.append(graph)
 
 ####################################
 # So, what I do below is basically wrong, in the sense that it runs, but it doesn-t contain the edges structure that would be needed.

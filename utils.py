@@ -22,17 +22,17 @@ def _get_stub_r(stubTypes, stubDetIds, stubLogicLayers):
     rs=[]
     for stubType, stubDetId, stubLogicLayer in zip(stubTypes, stubDetIds, stubLogicLayers):
         r=None
-        if stubType == 1: # DTs
+        if stubType == 3: # DTs
             if stubLogicLayer==0:
                 r= 431.133
             elif stubLogicLayer==2:
                 r=512.401
             elif stubLogicLayer==4:
                 r=617.946
-        elif stubType==2: # CSCs
+        elif stubType==9: # CSCs
             r=np.random.normal(loc=999., scale=50.) # to be replaced with actual values. I can't put a fixed number here because if it's constant then the point cloud library chops it down
-        elif stubType>2: # RPCs, but they will be shut down because they leak poisonous gas
-            r=np.random.normal(loc=999., scale=50.) # to be replaced with 999, once it's understood why only RPCs
+        elif stubType==5: # RPCs, but they will be shut down because they leak poisonous gas
+            r=999.
         rs.append(r)
 
     if len(rs) != len(stubTypes):
