@@ -1,14 +1,26 @@
 import os
 import uproot
 
-def get_test_data(library=None):
-    if not os.path.isfile('data/omtfAnalysis2.root'):
+def get_test_data(library=None, mode=None):
+
+    if mode=="old" and not os.path.isfile('data/omtfAnalysis2.root'):
         os.system('wget http://www.hep.uniovi.es/vischia/omtfsweetlove/omtfAnalysis2.root -P data/')
-        print('File downloaded into data/')
-    else:
-        print('File already exists in data/')
         
-    branches = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree')
+        print('File omtfAnalysis2.root downloaded into data/')
+    else:
+        print('File omtfAnalysis2.root already exists in data/')
+
+    if not os.path.isfile('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root'):
+        os.system('wget http://www.hep.uniovi.es/vischia/omtfsweetlove/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root -P data/')
+        print('File Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root downloaded into data/')
+    else:
+        print('File Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root already exists in data/')
+
+    branches=None
+    if mode=="old":
+        branches = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree')
+    else:
+        branches = uproot.open('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root:simOmtfPhase2Digis/OMTFHitsTree')
     print(branches.show())
     branches=branches.arrays(library=library) if library else branches.arrays()
     return branches
