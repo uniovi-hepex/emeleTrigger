@@ -93,7 +93,8 @@ for graph in graphs:
   nn = graph.number_of_nodes()
   if nn>nmax:
       gmax=copy.deepcopy(graph)
-nx.draw(graphs[25])
+      nmax=nn
+nx.draw(gmax)
 
 plt.show()
 # Convert each NetworkX graph to a PyTorch Geometric Data object
