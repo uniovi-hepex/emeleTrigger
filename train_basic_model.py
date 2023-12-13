@@ -82,13 +82,29 @@ sky = convert_to_point_cloud(branches)
 # Create a list to store individual graphs
 graphs = []
 
-connectedLogicLayers=[(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
+connectedLogicLayers={
+    #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
+    0: [2,6,7,9],
+    2: [4,6],
+    4: [6],
+    6: [7,8],
+    7: [8],
+    8: [],
+    9: [7],
+}
 
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
     print('CLOUD POINTS', cloud.points)
+    edges=[]
     for index, row in cloud.points.iterrows():
-        
+        if row['stubLogicLayer'] >9:
+            continue
+        dests=connectedLogicLayers[row['stubLogicLayer']]
+        for queriedindex, row in cloud.points.iterrows():
+            if queriedindex in dests:
+                edges.append((index,queriedindex))
+    print('EDGES', edges)
     # loop on cloud.points
     # build edges based on stubLayer
     graph.add_nodes_from(cloud.points.T) # Must be the transpose, it reads by colum instead of by row
