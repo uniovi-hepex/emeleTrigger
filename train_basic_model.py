@@ -64,9 +64,9 @@ v_get_stub_r = np.vectorize(_get_stub_r)
 
 def convert_to_point_cloud(arr):
 
-    print('GNEGNA', arr['stubType'])
     arr['stubR'] = v_get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
-    
+
+    # Next line won't work yet, need to flatten to have a point cloud that has each stub
     point_cloud_data = {'x': arr['stubR'], 'y': arr['stubEta'], 'z': arr['stubPhi']} # down the line maybe convert to actual cartesian coordinates
     # Create a PyntCloud object from the DataFrame
     cloud = PyntCloud(pd.DataFrame(point_cloud_data))
