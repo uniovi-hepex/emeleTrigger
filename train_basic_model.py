@@ -1,4 +1,4 @@
-from dataviz import get_test_data
+from utils import get_test_data visualize_graph
 import torch
 import torch.nn as nn
 
