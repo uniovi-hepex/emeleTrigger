@@ -61,15 +61,22 @@ def convert_to_point_cloud(arr):
 
 sky = convert_to_point_cloud(branches)
 
-print(sky[0].points.x)
-print(sky[0].points.describe())
-sky[0].points.boxplot()
-plt.show()
-scatter_matrix(sky[0].points, diagonal="kde", figsize=(8,8))
-plt.show()
+#print(sky[0].points)
+#print(sky[0].points.describe())
+#sky[0].points.boxplot()
+#plt.show()
+#scatter_matrix(sky[0].points, diagonal="kde", figsize=(8,8))
+#plt.show()
 
 # Create a list to store individual graphs
 graphs = []
+
+for index, cloud in enumerate(sky):
+    graph = nx.DiGraph()
+    node_attributes=cloud.points
+    graph.add_node(index, **node_attributes)
+    graphs.append(graph)
+
 
 # Iterate through each event and create a graph
 for index, row in branches.iterrows():
@@ -89,8 +96,6 @@ for index, row in branches.iterrows():
 # A sample code (for the tracker) is here>  https://github.com/CMS-GNN-Tracking-Hackathon-2021/interaction-network/blob/main/graph_construction/build_graph.py ,
 # where they define the allowed edges between the various parts of the tracker, in their case
 ####################
-
-
 
 
 # Assume your graph has node features and labels
