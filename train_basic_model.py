@@ -41,7 +41,7 @@ print(branches.head())
 
 def convert_to_point_cloud(arr):
 
-    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
+    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubEta'], arr['stubLogicLayer'])
 
     sky=[]
 

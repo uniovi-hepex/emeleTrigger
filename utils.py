@@ -5,6 +5,9 @@ import numpy as np
 
 NUM_PROCESSORS = 6
 NUM_PHI_BINS = 5400
+HW_ETA_TO_ETA_FACTOR=0.010875
+#HwEtaToEta conversion: 0.010875
+    #HwPhiToGlbPhi conversion:  hwPhi* 2. * M_PI / 576
 
 def foldPhi (phi):
     if (phi > NUM_PHI_BINS / 2):
@@ -17,10 +20,9 @@ def phiRel(phi, processor):
     return phi - foldPhi(NUM_PHI_BINS / NUM_PROCESSORS * (processor) + NUM_PHI_BINS / 24)
 
 
-def _get_stub_r(stubTypes, stubDetIds, stubLogicLayers):
-
+def _get_stub_r(stubTypes, stubDetIds, stubEtas, stubLogicLayers):
     rs=[]
-    for stubType, stubDetId, stubLogicLayer in zip(stubTypes, stubDetIds, stubLogicLayers):
+    for stubType, stubDetId, stubEta, stubLogicLayer in zip(stubTypes, stubDetIds, stubEtas, stubLogicLayers):
         r=None
         if stubType == 3: # DTs
             if stubLogicLayer==0:
@@ -30,7 +32,15 @@ def _get_stub_r(stubTypes, stubDetIds, stubLogicLayers):
             elif stubLogicLayer==4:
                 r=617.946
         elif stubType==9: # CSCs
-            r=np.random.normal(loc=999., scale=50.) # to be replaced with actual values. I can't put a fixed number here because if it's constant then the point cloud library chops it down
+            if stubLogicLayer==6:
+                z=7
+            elif stubLogicLayer==9:
+                z=6.8
+            elif stubLogicLayer==7:
+                z=8.2
+            elif stubLogicLayer==8:
+                z=9.3
+            r= z/np.cos( np.tan(2*np.arctan(np.exp(- stubEta*HW_ETA_TO_ETA_FACTOR)))  )
         elif stubType==5: # RPCs, but they will be shut down because they leak poisonous gas
             r=999.
         rs.append(r)
