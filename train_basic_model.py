@@ -40,9 +40,43 @@ print(branches['stubDPhi'])
 #generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 #dataset = get_training_dataset('data/point_clouds.hd5')
 
-# Now we need to flatten the structure 
+
+def _get_stub_r(stubTypes, stubDetIds, stubLogicLayers):
+
+    rs=[]
+    for stubType, stubDetId, stubLogicLayer in zip(stubTypes, stubDetIds, stubLogicLayers):
+        r=None
+        if stubType == 1: # DTs
+            if stubLogicLayer==0:
+                r= 431.133
+            elif stubLogicLayer==2:
+                r=512.401
+            elif stubLogicLayer==4:
+                r=617.946
+        elif stubType==2: # CSCs
+            r=999.
+        elif stubType>2: # RPCs, but they will be shut down because they leak poisonous gas
+            r=999.
+        rs.append(r)
+    return np.array(rs, dtype=object)
+
+v_get_stub_r = np.vectorize(_get_stub_r)
+
+def convert_to_point_cloud(arr):
+
+    print('GNEGNA', arr['stubType'])
+    arr['stubR'] = v_get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
+    
+    point_cloud_data = {'x': arr['stubR'], 'y': arr['stubEta'], 'z': arr['stubPhi']} # down the line maybe convert to actual cartesian coordinates
+    # Create a PyntCloud object from the DataFrame
+    cloud = PyntCloud(pd.DataFrame(point_cloud_data))
+
+    return cloud
 
 
+mycloud = convert_to_point_cloud(branches)
+
+print(mycloud)
 
 # Create a list to store individual graphs
 graphs = []
@@ -66,7 +100,9 @@ for index, row in branches.iterrows():
 # where they define the allowed edges between the various parts of the tracker, in their case
 ####################
 
-    
+
+
+
 # Assume your graph has node features and labels
 # You should replace this with your actual node features and labels
 node_features = torch.randn((num_nodes, num_features))  # Replace with your actual features
