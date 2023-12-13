@@ -95,20 +95,18 @@ connectedLogicLayers={
 
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
-    print('CLOUD POINTS', cloud.points)
     edges=[]
-    for index, row in cloud.points.iterrows():
+    for index, row in cloud.points.iterrows(): # build edges based on stubLayer
+
         if row['stubLogicLayer'] >9:
             continue
         dests=connectedLogicLayers[row['stubLogicLayer']]
         for queriedindex, row in cloud.points.iterrows():
             if queriedindex in dests:
                 edges.append((index,queriedindex))
-    print('EDGES', edges)
     # loop on cloud.points
-    # build edges based on stubLayer
     graph.add_nodes_from(cloud.points.T) # Must be the transpose, it reads by colum instead of by row
-    
+    graph.add_edges_from(edges)
     graphs.append(graph)
 
 
@@ -128,6 +126,7 @@ if viz:
     print(g.y)
     print(g.edge_index)
     plt.show()
+    visualize_graph(g, color=g.y)
     
 # Convert each NetworkX graph to a PyTorch Geometric Data object
 
