@@ -33,7 +33,8 @@ def _get_stub_r(stubTypes, stubDetIds, stubLogicLayers):
         elif stubType==2: # CSCs
             r=np.random.normal(loc=999., scale=50.) # to be replaced with actual values. I can't put a fixed number here because if it's constant then the point cloud library chops it down
         elif stubType>2: # RPCs, but they will be shut down because they leak poisonous gas
-            r=999.
+            # NEEDS TO BE r=999., once it-s understood why the input file has only RPCs
+            r=np.random.normal(loc=999., scale=50.)
         rs.append(r)
     if len(rs) != len(stubTypes):
         print('Tragic tragedy. R has len', len(rs), ', stubs have len', len(stubTypes))
