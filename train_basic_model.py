@@ -83,14 +83,17 @@ graphs = []
 
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
-    print(index, cloud.points)
-    node_attributes=cloud.points
-    for i, na in enumerate(node_attributes):
-        graph.add_node(i, **na)
+    graph.add_nodes_from(cloud.points.T) # Must be the transpose, it reads by colum instead of by row
     graphs.append(graph)
 
 
-nx.draw(graphs[0])
+gmax=None
+nmax=0
+for graph in graphs:
+  nn = graph.number_of_nodes()
+  if nn>nmax:
+      gmax=copy.deepcopy(graph)
+nx.draw(graphs[25])
 
 plt.show()
 # Convert each NetworkX graph to a PyTorch Geometric Data object
