@@ -40,6 +40,8 @@ print(branches['stubDPhi'])
 #generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 #dataset = get_training_dataset('data/point_clouds.hd5')
 
+# Now we need to flatten the structure 
+
 
 
 # Create a list to store individual graphs
