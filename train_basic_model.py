@@ -30,17 +30,6 @@ from torch.utils.data import DataLoader
 
 from itertools import combinations
 
-# Stuff that will go in a library
-def visualize_graph(G, color):
-    plt.figure(figsize=(10,10))
-    plt.xticks([])
-    plt.yticks([])
-    nx.draw_networkx(G, pos=nx.spring_layout(G, seed=43), with_labels=False,
-                     node_color=color, cmap='Set2')
-    plt.show()
-
-
-
 # End of stuff that will go in a library
 
 # Convert the dataset into a point cloud dataset
