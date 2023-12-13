@@ -1,4 +1,4 @@
-from utils import get_test_data visualize_graph
+from utils import get_test_data, visualize_graph
 import torch
 import torch.nn as nn
 
@@ -7,10 +7,7 @@ import copy
 
 import os
 
-import tensorflow as tf
-import tensorflow_io as tfio
-import tensorflow_datasets as tfds
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+import h5py
 
 import pandas as pd
 import numpy as np
@@ -20,82 +17,6 @@ from pyntcloud import PyntCloud
 import networkx as nx
 import matplotlib.pyplot as plt
 
-#from torch.utils.data import Dataset
-from torch_geometric.data import Dataset
-from torch.utils.data import DataLoader
-#import torch.nn.functional as F
-#from sklearn.model_selection import train_test_split
-#import matplotlib.pyplot as plt
-#import matplotlib
-
-from itertools import combinations
-
-# End of stuff that will go in a library
-
-# Convert the dataset into a point cloud dataset
-import h5py
-
-# Define a function to pad a list with zeros
-def pad_list(lst, max_list_length):
-    return lst + [0] * (max_list_length - len(lst))
-
-def pad_branches(df):
-    max_list_length = df.applymap(lambda x: len(x) if isinstance(x, list) else 0).max().max()
-    max_int_list_length = df.applymap(lambda x: np.max([len(y) if isinstance(y, list) else 0 for y in x].append(0)) if isinstance(x, list) else 0).max().max() # lolazo
-    # Apply the padding function to all columns containing lists
-    for col in df.columns:
-        df[col] = df[col].apply(lambda x: pad_list(x, max_list_length) if isinstance(x, list) else x)
-        df[col] = df[col].apply(lambda x: [  pad_list(y, max_int_list_length) if isinstance(y, list) else y for y in x] if isinstance(x, list) else x)
-        #for stuff in df[col]:
-        #        print("Stuff: ", len(stuff) if isinstance(stuff, list) else type(stuff))
-    return df
-
-
-def convert_to_point_cloud(branches):
-
-    #point_cloud_data = branches.copy()
-    #point_cloud_data = copy.deepcopy(branches[['muonPt', 'muonEta', 'muonPhi']])
-    point_cloud_data = {'x': branches['muonPt'], 'y': branches['muonEta'], 'z': branches['muonPhi']} # down the line maybe convert to actual cartesian coordinates
-    # Create a PyntCloud object from the DataFrame
-    cloud = PyntCloud(pd.DataFrame(point_cloud_data))
-
-    return cloud
-
-
-def generate_hdf5_dataset_with_padding(branches, hdf5_filename, save=False):
-
-    # Padding   
-    #padded_branches=np.asarray(pad_branches(branches))
-    # Padding and flattening
-    #padded_branches=ak.fill_none(ak.pad_none(branches, 2, clip=True), 999)
-    padded_branches=ak.to_dataframe(branches)
-
-    #padded_branches=branches.pad(longest, clip=True).fillna(0).regular()
-    #for name in padded_branches:
-    #    print('name', name)
-    #    print('counts', padded_branches[name])
-    #    #longest = padded_branches[name].counts.max()
-    #    padded_branches[name] = padded_branches[name].pad(longest).fillna(0).regular()
-    
-    #padded_branches = branches.pad(branches.counts.max()).fillna(0)
-    
-    point_clouds = convert_to_point_cloud(branches)
-    point_cloud_array = point_clouds.points.values
-
-    #print("SHAPE", padded_branches.shape)
-    #print("Columns shape")
-    #for i in range(39):
-    #    if isinstance(padded_branches[0,i], list):
-    #        print('List of ', type(padded_branches[0,i][0]))
-    #    else:
-    #        print(type(padded_branches[0,i]))
-                    
-    print('Padded branches type', type(padded_branches))
-
-    with h5py.File(hdf5_filename, 'w') as f:
-        #f.create_dataset('images', data= np.asarray(padded_branches.values, dtype=np.float64))
-        f.create_dataset('images', data=padded_branches, dtype=np.float64)
-        f.create_dataset('point_clouds', data=point_cloud_array)
 
 
 # Do we need normalization?
@@ -103,120 +24,18 @@ def resize_and_format_data(points, image):
     pass
 
 
-
-#def get_training_dataset(hdf5_path, BATCH_SIZE=128):
-#
-#    with h5py.File(hdf5_path, 'r') as f:
-#        # Assume 'your_dataset' is the name of the dataset in the HDF5 file
-#        x_train = f['/point_clouds']
-#        y_train = f['/images']
-#        # Convert the h5py dataset to a TensorFlow dataset
-#        x_train = tf.data.Dataset.from_tensor_slices(x_train)
-#        y_train = tf.data.Dataset.from_tensor_slices(y_train)
-#        # Zip them to create pairs
-#        training_dataset = tf.data.Dataset.zip((x_train,y_train))
-#        
-#        # Shuffle, prepare batches, etc ...
-#        training_dataset = training_dataset.shuffle(100, reshuffle_each_iteration=True)
-#        training_dataset = training_dataset.batch(BATCH_SIZE)
-#        training_dataset = training_dataset.repeat()
-#        training_dataset = training_dataset.prefetch(-1)
-#        
-#        return training_dataset
-
-
-from torch_geometric.data import Dataset, Data
-
-class OMTFDataset(Dataset):
-    def __init__(self, root, filename, transform=None, pre_transform=None, pre_filter=None):
-        self.filename=filename
-        super().__init__(root, transform, pre_transform, pre_filter)
-        
-    @property
-    def raw_file_names(self):
-        return self.filename
-
-    @property
-    def processed_file_names(self):
-        return [f'torchdata_{idx}.pt' for idx in range(len(self.raw_paths)) ]
-
-    def download(self):
-        pass
-
-    def process(self):
-        idx = 0
-
-        for raw_path in self.raw_paths:
-            # Read data from `raw_path`.
-
-
-            # HUGE MISTAKE. I NEED TO HAVE ONE GRAPH PER EVENT.
-            datafile= h5py.File(raw_path,'r')
-            # Get the point clouds
-            node_feats = datafile['point_clouds'][()]
-            G = nx.Graph()
-            G.add_nodes_from(node_feats)
-            # Get the original points
-            node_labels = datafile['images'][()]
-            print(node_feats)
-            edge_index = [list(combinations(x, 2)) for x in node_feats]
-            print("There are edges", len(edge_index[0]))
-            data = Data(x=node_feats,edge_index=edge_index,y=node_labels)
-
-            if self.pre_filter is not None and not self.pre_filter(data):
-                continue
-
-            if self.pre_transform is not None:
-                data = self.pre_transform(data)
-
-            torch.save(data, os.path.join(self.processed_dir, f'torchdata_{idx}.pt'))
-            idx += 1
-
-    def len(self):
-        return len(self.processed_file_names)
-
-    def get(self, idx):
-        data = torch.load(os.path.join(self.processed_dir, f'torchdata_{idx}.pt'))
-        return data
-
-
-    
-def get_training_dataset(hdf5_path, BATCH_SIZE=128):
-
-
-    # Get the point clouds
-    x_train = tfio.IODataset.from_hdf5(hdf5_path, dataset='/point_clouds')
-    # Get the original points
-    y_train = tfio.IODataset.from_hdf5(hdf5_path, dataset='/images')
-    # Zip them to create pairs
-    training_dataset = tf.data.Dataset.zip((x_train,y_train))
-    # Apply the data transformations
-    #training_dataset = training_dataset.map(resize_and_format_data)
-    
-    # Shuffle, prepare batches, etc ...
-    training_dataset = training_dataset.shuffle(100, reshuffle_each_iteration=True)
-    training_dataset = training_dataset.batch(BATCH_SIZE)
-    training_dataset = training_dataset.repeat()
-    training_dataset = training_dataset.prefetch(-1)
-    
-    # Return dataset
-    return training_dataset
-
-
-
 # Get data
-#branches = get_test_data('pd')
-#print(branches.head())
+branches = get_test_data('pd')
+print(branches.head())
 
 br=get_test_data('pd')
 pd.set_option('display.max_columns', None)
 print(br.head())
-quit()
-if False:
-    branches = get_test_data('ak')
-    generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 
 
+# Keep this
+#branches = get_test_data('ak')
+#generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 #dataset = get_training_dataset('data/point_clouds.hd5')
 
 
