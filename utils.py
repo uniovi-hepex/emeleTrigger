@@ -2,6 +2,20 @@ import os
 import uproot
 import numpy as np
 
+
+NUM_PROCESSORS = 6
+NUM_PHI_BINS = 5400
+
+def foldPhi (phi):
+    if (phi > NUM_PHI_BINS / 2):
+        return (phi - NUM_PHI_BINS)
+    elif (phi < -NUM_PHI_BINS / 2):
+        return (phi + NUM_PHI_BINS)
+    return phi
+
+def phiRel(phi, processor):
+    return phi - foldPhi(NUM_PHI_BINS / NUM_PROCESSORS * (processor) + NUM_PHI_BINS / 24)
+
 def get_test_data(library=None, mode=None):
 
     if mode=="old" and not os.path.isfile('data/omtfAnalysis2.root'):
