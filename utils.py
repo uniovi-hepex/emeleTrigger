@@ -1,5 +1,6 @@
 import os
 import uproot
+import numpy as np
 
 def get_test_data(library=None, mode=None):
 
@@ -23,6 +24,11 @@ def get_test_data(library=None, mode=None):
         branches = uproot.open('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root:simOmtfPhase2Digis/OMTFHitsTree')
     print(branches.show())
     branches=branches.arrays(library=library) if library else branches.arrays()
+
+    # Calculate deltaphis between layers, adding it to a new column
+    # this will be our proxy to the magnetic field
+    branches['stubDPhi'] = branches['stubPhi'].apply(lambda x: np.diff(x))
+
     return branches
 
 def visualize_graph(G, color):

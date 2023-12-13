@@ -28,16 +28,12 @@ def resize_and_format_data(points, image):
 branches = get_test_data('pd')
 print(branches.head())
 
-br=get_test_data('pd')
-pd.set_option('display.max_columns', None)
-print(br.head())
+#br=get_test_data('pd')
+#pd.set_option('display.max_columns', None)
+#print(br.head())
 
-# Calculate deltaphis between layers, adding it to a new column
-# this will be our proxy to the magnetic field
-
-
-
-
+print(branches['stubPhi'])
+print(branches['stubDPhi'])
 
 # Keep this
 #branches = get_test_data('ak')
