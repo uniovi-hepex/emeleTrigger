@@ -19,7 +19,7 @@ from pyntcloud import PyntCloud
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from torch_geometric.utils.convert import from_networkx
+from torch_geometric.utils.convert import from_networkx, to_networkx
 
 # Do we need normalization?
 def resize_and_format_data(points, image):
@@ -82,7 +82,7 @@ sky = convert_to_point_cloud(branches)
 # Create a list to store individual graphs
 graphs = []
 
-connectedLogicLayers={
+logicLayersConnectionMap={
     #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
     0: [2,6,7,9],
     2: [4,6],
@@ -93,14 +93,14 @@ connectedLogicLayers={
     9: [7],
 }
 
+def getEdgesFromLogicLayer(logicLayer):
+    return (logicLayersConnectionMap[logicLayer] if logicLayer<10 else [])
+
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
     edges=[]
     for index, row in cloud.points.iterrows(): # build edges based on stubLayer
-
-        if row['stubLogicLayer'] >9:
-            continue
-        dests=connectedLogicLayers[row['stubLogicLayer']]
+        dests=getEdgesFromLogicLayer(row['stubLogicLayer'])
         for queriedindex, row in cloud.points.iterrows():
             if queriedindex in dests:
                 edges.append((index,queriedindex))
@@ -126,20 +126,31 @@ if viz:
     print(g.y)
     print(g.edge_index)
     plt.show()
-    visualize_graph(g, color=g.y)
     
 # Convert each NetworkX graph to a PyTorch Geometric Data object
-
-
 pg_graphs=[from_networkx(g) for g in graphs]
 
 
-pg=pg_graphs[22]
+pg=None
+nmax=0
+for g in pg_graphs:
+    nn=g.num_nodes
+    if nn>nmax:
+        pg=copy.deepcopy(g)
+        nmax=nn
 print(pg)
 print(pg.x)
 print(pg.y)
 print(pg.edge_index)
-visualize_graph(pg, color=pg.y)
+
+# Gather some statistics about the graph.
+print(f'Number of nodes: {pg.num_nodes}') #Number of nodes in the graph
+print(f'Number of edges: {pg.num_edges}') #Number of edges in the graph
+print(f'Average node degree: {pg.num_edges / pg.num_nodes:.2f}') # Average number of nodes in the graph
+print(f'Contains isolated nodes: {pg.has_isolated_nodes()}') #Does the graph contains nodes that are not connected
+print(f'Contains self-loops: {pg.has_self_loops()}') #Does the graph contains nodes that are linked to themselves
+print(f'Is undirected: {pg.is_undirected()}') #Is the graph an undirected graph
+nx.draw(to_networkx(pg), with_labels=True)
 
 quit()
 
