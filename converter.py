@@ -34,3 +34,11 @@ globalPhiRad = stubPhiToGlobalPhi(stubPhi, phiZero(0))
 
 # ETA CONVERSION
 
+etaUnit = 0.010875  # =2.61/240
+
+def stubEtaToGlobalEta (stubEta):
+    globalEta = stubEta * etaUnit
+    return globalEta
+
+# R conversion
+
