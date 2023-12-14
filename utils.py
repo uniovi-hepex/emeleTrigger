@@ -1,3 +1,7 @@
+#
+# Pietro Vischia, 2023
+#
+
 import os
 import uproot
 import numpy as np

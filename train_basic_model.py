@@ -1,3 +1,8 @@
+#
+# Pietro Vischia, 2023
+#
+
+
 from utils import get_test_data, visualize_graph, get_stub_r
 import torch
 import torch.nn as nn
@@ -42,15 +47,19 @@ print(branches.head())
 def convert_to_point_cloud(arr):
 
     arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubEta'], arr['stubLogicLayer'])
-
-    sky=[]
-
     for index, row in arr.iterrows():
         if not ( len(arr['stubR'][index])==len(arr['stubEta'][index]) and len(arr['stubEta'][index])==len(arr['stubPhi'][index])):
             print('HUGE PROBLEM, sizes not match: R,eta,phi ', len(arr['stubR'][index]), len(arr['stubEta'][index]), len(arr['stubPhi'][index]))
+    arr=arr.rename(columns={"stubR": "x", "stubEta": "y", "stubPhi": "z"}, errors="raise")
+
+    keep=['x', 'y', 'z', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
+
+    sky=[]
     for index, row in arr.iterrows():
         # Here now I need to enrich this with the stublogiclayer etc, for the edges
-        pc = {'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi'], 'stubLogicLayer': row['stubLogicLayer']} # down the line maybe convert to actual cartesian coordinates
+        pc = {} #{'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi'], 'stubLogicLayer': row['stubLogicLayer']} # down the line maybe convert to actual cartesian coordinates
+        for label in keep:
+            pc[label] = row[label]
         # Create a PyntCloud object from the DataFrame
         if len(pc['x'])==0:
             continue
@@ -62,7 +71,7 @@ def convert_to_point_cloud(arr):
 def convert_to_point_cloud_bad(arr):
 
     arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
-
+    
     pc = {'x': arr['stubR'], 'y': arr['stubEta'], 'z': arr['stubPhi']} # down the line maybe convert to actual cartesian coordinates
     print('THECLOUD', pc)
     # Create a PyntCloud object from the DataFrame
@@ -96,37 +105,81 @@ logicLayersConnectionMap={
 def getEdgesFromLogicLayer(logicLayer):
     return (logicLayersConnectionMap[logicLayer] if logicLayer<10 else [])
 
+
+def convert_to_graphs(arr):
+
+    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubEta'], arr['stubLogicLayer'])
+    
+    keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
+
+    sky=[]
+    for index, row in arr.iterrows():
+        # Here now I need to enrich this with the stublogiclayer etc, for the edges
+        pc = {} #{'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi'], 'stubLogicLayer': row['stubLogicLayer']} # down the line maybe convert to actual cartesian coordinates
+        for label in keep:
+            pc[label] = row[label]
+        # Create a PyntCloud object from the DataFrame
+        if len(pc['stubR'])==0:
+            continue
+        sky.append(pd.DataFrame(pc))
+
+    return sky
+
+sky = convert_to_graphs(branches)
+
+
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
+    nodes = []
+    keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
     edges=[]
-    for index, row in cloud.points.iterrows(): # build edges based on stubLayer
+    for index, row in cloud.iterrows(): # build edges based on stubLayer
+        nodes.append((index, {k: row[k] for k in keep}))
         dests=getEdgesFromLogicLayer(row['stubLogicLayer'])
-        for queriedindex, row in cloud.points.iterrows():
+        for queriedindex, row in cloud.iterrows():
             if queriedindex in dests:
                 edges.append((index,queriedindex))
-    # loop on cloud.points
-    graph.add_nodes_from(cloud.points.T) # Must be the transpose, it reads by colum instead of by row
+    # Rename back
+    #cp=cloud.points.rename(columns={"x": "stubR", "y": "stubEta", "z": "stubPhi", "muonPt": "y"}, errors="raise")
+    graph.add_nodes_from(nodes) # Must be the transpose, it reads by colum instead of by row
     graph.add_edges_from(edges)
     graphs.append(graph)
+#for index, cloud in enumerate(sky):
+#    graph = nx.DiGraph()
+#    edges=[]
+#    for index, row in cloud.points.iterrows(): # build edges based on stubLayer
+#        dests=getEdgesFromLogicLayer(row['stubLogicLayer'])
+#        for queriedindex, row in cloud.points.iterrows():
+#            if queriedindex in dests:
+#                edges.append((index,queriedindex))
+#    # Rename back
+#    cp=cloud.points.rename(columns={"x": "stubR", "y": "stubEta", "z": "stubPhi", "muonPt": "y"}, errors="raise")
+#    graph.add_nodes_from(cp.T) # Must be the transpose, it reads by colum instead of by row
+#    graph.add_edges_from(edges)
+#    graphs.append(graph)
 
 
-viz=True
+viz=False
 if viz:
     gmax=None
     nmax=0
     for graph in graphs:
-        nn = graph.number_of_nodes()
-        if nn>nmax:
+        numnodes = graph.number_of_nodes()
+        if numnodes>nmax:
             gmax=copy.deepcopy(graph)
-            nmax=nn
+            nmax=numnodes
     nx.draw(gmax, with_labels=True)
+    print(gmax.nodes.data(True))
     g=from_networkx(gmax)
     print(g)
-    print(g.x)
+    print()
     print(g.y)
     print(g.edge_index)
     plt.show()
-    
+
+
+
+
 # Convert each NetworkX graph to a PyTorch Geometric Data object
 pg_graphs=[from_networkx(g) for g in graphs]
 
@@ -134,15 +187,17 @@ pg_graphs=[from_networkx(g) for g in graphs]
 pg=None
 nmax=0
 for g in pg_graphs:
-    nn=g.num_nodes
-    if nn>nmax:
+    numnodes=g.num_nodes
+    if numnodes>nmax:
         pg=copy.deepcopy(g)
-        nmax=nn
+        nmax=numnodes
+
+print('networkx graph')
 print(pg)
 print(pg.x)
 print(pg.y)
 print(pg.edge_index)
-
+print('-----------------')
 # Gather some statistics about the graph.
 print(f'Number of nodes: {pg.num_nodes}') #Number of nodes in the graph
 print(f'Number of edges: {pg.num_edges}') #Number of edges in the graph
@@ -152,28 +207,134 @@ print(f'Contains self-loops: {pg.has_self_loops()}') #Does the graph contains no
 print(f'Is undirected: {pg.is_undirected()}') #Is the graph an undirected graph
 nx.draw(to_networkx(pg), with_labels=True)
 
+
+
+#data_list = []
+#for graph in pg_graphs:
+#    print('pajoerlia', type(graph))
+#    # Extract node features and labels
+#    #print(graph, list(graph.nodes), list(graph.edges))
+#    #print("FEATURES", graph.nodes(data=True))
+#    #print("LABELS", graph.nodes(data='muonPt'))
+#    #node_features = graph.nodes(data=True)
+#    #node_labels = graph.nodes(data='muonPt')
+#    keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
+#    print('mehhhhhh', graph.nodes(data='stubProc'))
+#    # Convert to PyTorch tensors
+#    x = torch.tensor([graph.nodes(data=feat) for feat in node_features], dtype=torch.float32)
+#    y = torch.tensor([graph.nodes(data=label) for label in node_labels], dtype=torch.float32)
+#
+#    # Assuming your graph has edges
+#    edge_index = torch.tensor(list(graph.edges), dtype=torch.long).t().contiguous()
+#
+#    # Create a PyTorch Geometric Data object
+#    data = Data(x=x, edge_index=edge_index, y=y)
+#
+#    data_list.append(data)
+
+
+# Create a DataLoader
+from torch_geometric.loader import DataLoader
+from torch_geometric.nn import GCNConv
+
+# Once it's shuffled, we slice the data to split
+train_dataset = pg_graphs[:int(121/2)]
+test_dataset = pg_graphs[int(121/2):]
+
+train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+test_loader  = DataLoader(test_dataset, batch_size=8, shuffle=True)
+
+
+# Define a simple GNN model
+class GCN(torch.nn.Module):
+    def __init__(self, num_node_features, num_channels, num_outputs):
+        super().__init__()
+        self.conv1 = GCNConv(num_node_features, num_channels)
+        self.conv2 = GCNConv(num_channels, num_outputs)
+
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, training=self.training)
+        x = self.conv2(x, edge_index)
+
+        return F.log_softmax(x, dim=1)
+
+# Instantiate the model, loss function, and optimizer
+model = GCN(pg_graphs[0].num_node_features,16,1).to(torch.device("mps"))
+criterion = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+# Training loop
+num_epochs = 100
+for epoch in range(num_epochs):
+    for data in train_loader:
+        optimizer.zero_grad()
+        out = model(data)
+        loss = criterion(out, data.y)
+        loss.backward()
+        optimizer.step()
+model.eval()
+pred = model(test_loader[0]).argmax(dim=1)
+correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
+acc = int(correct) / int(data.test_mask.sum())
+print(f'Accuracy: {acc:.4f}')
+print("TRAINED")
+
 quit()
 
-data_list = []
-for graph in graphs:
-    # Extract node features and labels
-    print(graph, list(graph.nodes), list(graph.edges))
-    print("FEATURES", graph.nodes(data='features'))
-    print("LABELS", graph.nodes(data='labels'))
-    node_features = graph.nodes(data='features')
-    node_labels = graph.nodes(data='label')
+from torch_geometric.nn import GCNConv
+class GCN(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = GCNConv(dataset.num_node_features, 16)
+        self.conv2 = GCNConv(16, dataset.num_classes)
 
-    # Convert to PyTorch tensors
-    x = torch.tensor([node['features'] for node in node_features], dtype=torch.float32)
-    y = torch.tensor([node['label'] for node in node_labels], dtype=torch.long)
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
 
-    # Assuming your graph has edges
-    edge_index = torch.tensor(list(graph.edges), dtype=torch.long).t().contiguous()
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, training=self.training)
+        x = self.conv2(x, edge_index)
 
-    # Create a PyTorch Geometric Data object
-    data = Data(x=x, edge_index=edge_index, y=y)
+        return F.log_softmax(x, dim=1)
 
-    data_list.append(data)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = GCN().to(device)
+data = dataset[0].to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+model.train()
+for epoch in range(200):
+    optimizer.zero_grad()
+    out = model(data)
+    loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+    loss.backward()
+    optimizer.step()
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = GCN().to(device)
+data = dataset[0].to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+model.train()
+for epoch in range(200):
+    optimizer.zero_grad()
+    out = model(data)
+    loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+    loss.backward()
+    optimizer.step()
+
+
+
+quit()
+
+
+
+
 
 # Create a DataLoader
 train_loader = DataLoader(data_list, batch_size=batch_size, shuffle=True)
