@@ -277,34 +277,44 @@ num_epochs = 100
 def train():
     model.train()
 
-    total_loss = 0
+    total_loss=0
     for data in train_loader:
         optimizer.zero_grad()
         out = model(data)
-        loss = criterion(out, data.y)
+        loss = criterion(out, data.y.unsqueeze(1))
         loss.backward()
         optimizer.step()
         total_loss += float(loss) * data.num_graphs
 
-    return total_loss / len(train_loader.dataset)
+    return total_loss/len(train_loader.dataset)
 
 def test():
     with torch.no_grad():
         model.eval()
 
-        total_correct = 0
+        total_loss = 0
         for data in test_loader:
-            logits = model(data)
-            pred = logits.argmax(dim=-1)
-            total_correct += int((pred == data.y).sum())
+            out = model(data)
+            loss = criterion(out, data.y.unsqueeze(1))
+            total_loss += float(loss) * data.num_graphs
 
-        return total_correct / len(test_loader.dataset)
+        return total_loss/len(test_loader.dataset)
 
+train_losses=[]
+test_losses=[]
 for epoch in range(num_epochs):
-    loss = train()
-    test_acc = test()
-    print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Test Acc: {test_acc:.4f}')
+    train_loss = train()
+    test_loss = test()
 
+    train_losses.append(train_loss)
+    test_losses.append(test_loss)
+    print(f'Epoch: {epoch:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
+
+
+epochs = [ x for x in range(num_epochs)]
+plt.plot(epochs, train_losses, label="Train loss")
+plt.plot(epochs, test_losses, label="Test loss")
+plt.show()
 
 quit()
 
