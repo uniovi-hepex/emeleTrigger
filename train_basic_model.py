@@ -131,10 +131,11 @@ sky = convert_to_graphs(branches)
 for index, cloud in enumerate(sky):
     graph = nx.DiGraph()
     nodes = []
-    keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
+    keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer']
     edges=[]
     for index, row in cloud.iterrows(): # build edges based on stubLayer
-        nodes.append((index, {k: row[k] for k in keep}))
+        #nodes.append((index, {k: row[k] for k in keep}))
+        nodes.append((index, { 'x': [row[k] for k in keep], 'y' : np.float64(row['muonPt']) }))
         dests=getEdgesFromLogicLayer(row['stubLogicLayer'])
         for queriedindex, row in cloud.iterrows():
             if queriedindex in dests:
@@ -246,6 +247,8 @@ test_loader  = DataLoader(test_dataset, batch_size=8, shuffle=True)
 
 
 # Define a simple GNN model
+torch.set_default_dtype(torch.float64)
+import torch.nn.functional as F
 class GCN(torch.nn.Module):
     def __init__(self, num_node_features, num_channels, num_outputs):
         super().__init__()
@@ -254,21 +257,58 @@ class GCN(torch.nn.Module):
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
-
+        x = x.double()
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = F.dropout(x, training=self.training)
         x = self.conv2(x, edge_index)
-
-        return F.log_softmax(x, dim=1)
+        x = x.double()
+        return x
 
 # Instantiate the model, loss function, and optimizer
-model = GCN(pg_graphs[0].num_node_features,16,1).to(torch.device("mps"))
+model = GCN(pg_graphs[0].num_node_features,16,1) #.to(torch.device("mps"))
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 # Training loop
 num_epochs = 100
+
+
+def train():
+    model.train()
+
+    total_loss = 0
+    for data in train_loader:
+        optimizer.zero_grad()
+        out = model(data)
+        loss = criterion(out, data.y)
+        loss.backward()
+        optimizer.step()
+        total_loss += float(loss) * data.num_graphs
+
+    return total_loss / len(train_loader.dataset)
+
+def test():
+    with torch.no_grad():
+        model.eval()
+
+        total_correct = 0
+        for data in test_loader:
+            logits = model(data)
+            pred = logits.argmax(dim=-1)
+            total_correct += int((pred == data.y).sum())
+
+        return total_correct / len(test_loader.dataset)
+
+for epoch in range(num_epochs):
+    loss = train()
+    test_acc = test()
+    print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Test Acc: {test_acc:.4f}')
+
+
+quit()
+
+
 for epoch in range(num_epochs):
     for data in train_loader:
         optimizer.zero_grad()
@@ -283,7 +323,6 @@ acc = int(correct) / int(data.test_mask.sum())
 print(f'Accuracy: {acc:.4f}')
 print("TRAINED")
 
-quit()
 
 from torch_geometric.nn import GCNConv
 class GCN(torch.nn.Module):
