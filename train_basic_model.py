@@ -1,7 +1,3 @@
-# Contributors
-### Core model setup and development: P. Vischia
-###
-
 from utils import get_test_data, visualize_graph, get_stub_r
 import torch
 import torch.nn as nn

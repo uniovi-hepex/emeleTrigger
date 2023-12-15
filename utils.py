@@ -1,7 +1,3 @@
-# Contributors
-### Core model setup and development: P. Vischia
-##
-
 import os
 import uproot
 import numpy as np
