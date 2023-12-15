@@ -1,7 +1,6 @@
-#
-# Pietro Vischia, 2023
-#
-
+# Contributors
+### Core model setup and development: P. Vischia
+###
 
 from utils import get_test_data, visualize_graph, get_stub_r
 import torch
@@ -30,6 +29,8 @@ from torch_geometric.utils.convert import from_networkx, to_networkx
 def resize_and_format_data(points, image):
     pass
 
+torch.set_default_dtype(torch.float64)
+#torch.set_default_dtype(torch.float32)
 
 # Get data
 branches = get_test_data('pd')
@@ -42,6 +43,7 @@ print(branches.head())
 #branches = get_test_data('ak')
 #generate_hdf5_dataset_with_padding(branches, 'data/point_clouds.hd5')
 #dataset = get_training_dataset('data/point_clouds.hd5')
+
 
 
 def convert_to_point_cloud(arr):
@@ -93,7 +95,8 @@ graphs = []
 
 logicLayersConnectionMap={
     #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
-    0: [2,6,7,9],
+    # Put here catalog of names0
+    0: [2,6,7],
     2: [4,6],
     4: [6],
     6: [7,8],
@@ -160,7 +163,7 @@ for index, cloud in enumerate(sky):
 #    graphs.append(graph)
 
 
-viz=False
+viz=True
 if viz:
     gmax=None
     nmax=0
@@ -234,6 +237,7 @@ nx.draw(to_networkx(pg), with_labels=True)
 #    data_list.append(data)
 
 
+
 # Create a DataLoader
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GCNConv
@@ -242,12 +246,15 @@ from torch_geometric.nn import GCNConv
 train_dataset = pg_graphs[:int(121/2)]
 test_dataset = pg_graphs[int(121/2):]
 
+#for d in train_dataset:
+#    d.to(torch.device("mps"))
+#for d in test_dataset:
+#    d.to(torch.device("mps"))
 train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 test_loader  = DataLoader(test_dataset, batch_size=8, shuffle=True)
 
 
 # Define a simple GNN model
-torch.set_default_dtype(torch.float64)
 import torch.nn.functional as F
 class GCN(torch.nn.Module):
     def __init__(self, num_node_features, num_channels, num_outputs):
@@ -265,8 +272,17 @@ class GCN(torch.nn.Module):
         x = x.double()
         return x
 
+
 # Instantiate the model, loss function, and optimizer
-model = GCN(pg_graphs[0].num_node_features,16,1) #.to(torch.device("mps"))
+model=None
+dotrain=True  # move this to runtime option
+if not dotrain:
+    model = torch.load('models/model.pth')
+    model.eval()
+else:
+    model = GCN(pg_graphs[0].num_node_features,8,1)#.to(torch.device("mps"))
+
+
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
@@ -284,7 +300,8 @@ def train():
         loss = criterion(out, data.y.unsqueeze(1))
         loss.backward()
         optimizer.step()
-        total_loss += float(loss) * data.num_graphs
+        #total_loss += float(loss) * data.num_graphs
+        total_loss += float(loss)
 
     return total_loss/len(train_loader.dataset)
 
@@ -296,29 +313,58 @@ def test():
         for data in test_loader:
             out = model(data)
             loss = criterion(out, data.y.unsqueeze(1))
-            total_loss += float(loss) * data.num_graphs
-
+            #total_loss += float(loss) * data.num_graphs
+            total_loss += float(loss)
         return total_loss/len(test_loader.dataset)
 
 train_losses=[]
 test_losses=[]
-for epoch in range(num_epochs):
-    train_loss = train()
-    test_loss = test()
-
-    train_losses.append(train_loss)
-    test_losses.append(test_loss)
-    print(f'Epoch: {epoch:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
 
 
-epochs = [ x for x in range(num_epochs)]
-plt.plot(epochs, train_losses, label="Train loss")
-plt.plot(epochs, test_losses, label="Test loss")
+if dotrain:
+    for epoch in range(num_epochs):
+        train_loss = train()
+        test_loss = test()
+
+        train_losses.append(train_loss)
+        test_losses.append(test_loss)
+        print(f'Epoch: {epoch:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
+        torch.save(model, 'models/mode.pth')
+    epochs = [ x for x in range(num_epochs)]
+    plt.plot(epochs, train_losses, label="Train loss")
+    plt.plot(epochs, test_losses, label="Test loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("MSE loss (rescaled)")
+    plt.legend(loc='best')
+    plt.show()
+
+
+truth=[]
+pred=[]
+for data in train_loader:
+    out = model(data)
+    for o, t in zip(out, data.y):
+        pred.append(o.detach().numpy())
+        truth.append(t.detach().numpy())
+
+plt.scatter(truth, pred)
+plt.xlabel("True muon pT")
+plt.ylabel("Predicted muon pT")
 plt.show()
 
+
+#nonsensical for the moment
+plt.hist(pred, label="Predicted muon pT")
+plt.hist(truth, label="True muon pT")
+plt.show()
 quit()
 
-
+# I will remove most of what is below when designing a better structure of the GNN and cleaning up the code, next week (17december onwards),
+##########################################################################################################################################################################################################################################
+#####################################################################################################################
+#####################################################################################################################
+#####################################################################################################################
+##########################################################################################################################################################################################################################################
 for epoch in range(num_epochs):
     for data in train_loader:
         optimizer.zero_grad()
@@ -450,7 +496,7 @@ for graph in list_of_networkx_graphs:
     node_labels = graph.nodes(data='label')
 
     # Convert to PyTorch tensors
-    x = torch.tensor([node['features'] for node in node_features], dtype=torch.float32)
+    x = torch.tensor([node['features'] for node in node_features], dtype=torch.float64)
     y = torch.tensor([node['label'] for node in node_labels], dtype=torch.long)
 
     # Assuming your graph has edges

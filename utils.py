@@ -1,6 +1,6 @@
-#
-# Pietro Vischia, 2023
-#
+# Contributors
+### Core model setup and development: P. Vischia
+##
 
 import os
 import uproot
@@ -75,10 +75,16 @@ def get_test_data(library=None, mode=None):
     if mode=="old":
         branches = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree')
     else:
-        branches = uproot.open('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root:simOmtfPhase2Digis/OMTFHitsTree')
+        #branches = uproot.open('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root:simOmtfPhase2Digis/OMTFHitsTree')
+        #branches = uproot.open('data/SingleMu_GT131X_Extrapolation_GhostBusterTest_FlatPt0To1000Dxy3m_NonDegraded_Stub_v2.root:simOmtfDigis/OMTFHitsTree')
+        branches = uproot.open('data/SingleMu_GT131X_Extrapolation_GhostBusterTest_XTo2LLP4Mu_Ctau5m_Stub.root:simOmtfDigis/OMTFHitsTree')
+        
+        
     print(branches.show())
     branches=branches.arrays(library=library) if library else branches.arrays()
-
+    print('Downsampling...')
+    branches=branches.sample(frac=0.05)
+    print('Downsampling done')
     # Calculate deltaphis between layers, adding it to a new column
     # this will be our proxy to the magnetic field
     branches['stubDPhi'] = branches['stubPhi'].apply(lambda x: np.diff(x))
@@ -167,6 +173,7 @@ def get_training_dataset(hdf5_path, BATCH_SIZE=128):
         # Zip them to create pairs
         training_dataset = tf.data.Dataset.zip((x_train,y_train))
         
+
         # Shuffle, prepare batches, etc ...
         training_dataset = training_dataset.shuffle(100, reshuffle_each_iteration=True)
         training_dataset = training_dataset.batch(BATCH_SIZE)
