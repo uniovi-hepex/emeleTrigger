@@ -4,11 +4,25 @@ import numpy as np
 import networkx as nx
 from matplotlib import pyplot as plt
 
+from torch_geometric.utils.convert import from_networkx, to_networkx
+
 NUM_PROCESSORS = 6
 NUM_PHI_BINS = 5400
 HW_ETA_TO_ETA_FACTOR=0.010875
 #HwEtaToEta conversion: 0.010875
     #HwPhiToGlbPhi conversion:  hwPhi* 2. * M_PI / 576
+LOGIC_LAYERS_CONNECTION_MAP={
+    #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
+    # Put here catalog of names0
+    0: [2,6,7],
+    2: [4,6],
+    4: [6],
+    6: [7,8],
+    7: [8],
+    8: [],
+    9: [7],
+}
+
 
 def foldPhi (phi):
     if (phi > NUM_PHI_BINS / 2):
@@ -71,15 +85,15 @@ def get_test_data(library=None, mode=None):
     if mode=="old":
         branches = uproot.open('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree')
     else:
-        #branches = uproot.open('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root:simOmtfPhase2Digis/OMTFHitsTree')
+        branches = uproot.open('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root:simOmtfPhase2Digis/OMTFHitsTree')
         #branches = uproot.open('data/SingleMu_GT131X_Extrapolation_GhostBusterTest_FlatPt0To1000Dxy3m_NonDegraded_Stub_v2.root:simOmtfDigis/OMTFHitsTree')
-        branches = uproot.open('data/SingleMu_GT131X_Extrapolation_GhostBusterTest_XTo2LLP4Mu_Ctau5m_Stub.root:simOmtfDigis/OMTFHitsTree')
+        #branches = uproot.open('data/SingleMu_GT131X_Extrapolation_GhostBusterTest_XTo2LLP4Mu_Ctau5m_Stub.root:simOmtfDigis/OMTFHitsTree')
         
         
     print(branches.show())
     branches=branches.arrays(library=library) if library else branches.arrays()
     print('Downsampling...')
-    branches=branches.sample(frac=0.05)
+    branches=branches.sample(frac=0.5)
     print('Downsampling done')
     # Calculate deltaphis between layers, adding it to a new column
     # this will be our proxy to the magnetic field
@@ -96,7 +110,43 @@ def visualize_graph(G, color):
     plt.show()
 
 
-def convert_to_point_cloud_old(branches):
+def convert_to_point_cloud(arr):
+
+    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubEta'], arr['stubLogicLayer'])
+    for index, row in arr.iterrows():
+        if not ( len(arr['stubR'][index])==len(arr['stubEta'][index]) and len(arr['stubEta'][index])==len(arr['stubPhi'][index])):
+            print('HUGE PROBLEM, sizes not match: R,eta,phi ', len(arr['stubR'][index]), len(arr['stubEta'][index]), len(arr['stubPhi'][index]))
+    arr=arr.rename(columns={"stubR": "x", "stubEta": "y", "stubPhi": "z"}, errors="raise")
+
+    keep=['x', 'y', 'z', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
+
+    sky=[]
+    for index, row in arr.iterrows():
+        # Here now I need to enrich this with the stublogiclayer etc, for the edges
+        pc = {} #{'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi'], 'stubLogicLayer': row['stubLogicLayer']} # down the line maybe convert to actual cartesian coordinates
+        for label in keep:
+            pc[label] = row[label]
+        # Create a PyntCloud object from the DataFrame
+        if len(pc['x'])==0:
+            continue
+        cloud = PyntCloud(pd.DataFrame(pc))
+        sky.append(cloud)
+
+    return sky
+
+
+def convert_to_point_cloud_old(arr):
+
+    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubLogicLayer'])
+    
+    pc = {'x': arr['stubR'], 'y': arr['stubEta'], 'z': arr['stubPhi']} # down the line maybe convert to actual cartesian coordinates
+    print('THECLOUD', pc)
+    # Create a PyntCloud object from the DataFrame
+    cloud = PyntCloud(pd.DataFrame(pc))
+    return cloud
+
+
+def convert_to_point_cloud_vold(branches):
 
     #point_cloud_data = branches.copy()
     #point_cloud_data = copy.deepcopy(branches[['muonPt', 'muonEta', 'muonPhi']])
@@ -105,6 +155,110 @@ def convert_to_point_cloud_old(branches):
     cloud = PyntCloud(pd.DataFrame(point_cloud_data))
 
     return cloud
+
+def getEdgesFromLogicLayer(logicLayer):
+    return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer] if logicLayer<10 else [])
+
+
+def addEdges(sky):
+    graphs = []
+    for index, cloud in enumerate(sky):
+        graph = nx.DiGraph()
+        nodes = []
+        keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer']
+        edges=[]
+        for index, row in cloud.iterrows(): # build edges based on stubLayer
+            #nodes.append((index, {k: row[k] for k in keep}))
+            nodes.append((index, { 'x': [row[k] for k in keep], 'y' : np.float64(row['muonPt']) }))
+            dests=getEdgesFromLogicLayer(row['stubLogicLayer'])
+            for queriedindex, row in cloud.iterrows():
+                if queriedindex in dests:
+                    edges.append((index,queriedindex))
+                # Rename back
+        #cp=cloud.points.rename(columns={"x": "stubR", "y": "stubEta", "z": "stubPhi", "muonPt": "y"}, errors="raise")
+        graph.add_nodes_from(nodes) # Must be the transpose, it reads by colum instead of by row
+        graph.add_edges_from(edges)
+        graphs.append(graph)
+        #for index, cloud in enumerate(sky):
+        #    graph = nx.DiGraph()
+        #    edges=[]
+        #    for index, row in cloud.points.iterrows(): # build edges based on stubLayer
+        #        dests=getEdgesFromLogicLayer(row['stubLogicLayer'])
+        #        for queriedindex, row in cloud.points.iterrows():
+        #            if queriedindex in dests:
+        #                edges.append((index,queriedindex))
+        #    # Rename back
+        #    cp=cloud.points.rename(columns={"x": "stubR", "y": "stubEta", "z": "stubPhi", "muonPt": "y"}, errors="raise")
+        #    graph.add_nodes_from(cp.T) # Must be the transpose, it reads by colum instead of by row
+        #    graph.add_edges_from(edges)
+        #    graphs.append(graph)
+    return graphs
+
+
+def convert_to_graphs(branches, viz=False):
+    arr = convert_to_point_cloud(branches)
+
+    arr['stubR'] = get_stub_r(arr['stubType'], arr['stubDetId'], arr['stubEta'], arr['stubLogicLayer'])
+    
+    keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
+
+    sky=[]
+    for index, row in arr.iterrows():
+        # Here now I need to enrich this with the stublogiclayer etc, for the edges
+        pc = {} #{'x': row['stubR'], 'y': row['stubEta'], 'z': row['stubPhi'], 'stubLogicLayer': row['stubLogicLayer']} # down the line maybe convert to actual cartesian coordinates
+        for label in keep:
+            pc[label] = row[label]
+        # Create a PyntCloud object from the DataFrame
+        if len(pc['stubR'])==0:
+            continue
+        sky.append(pd.DataFrame(pc))
+
+    graphs=addEdges(sky)
+    if viz:
+        gmax=None
+        nmax=0
+        for graph in graphs:
+            numnodes = graph.number_of_nodes()
+            if numnodes>nmax:
+                gmax=copy.deepcopy(graph)
+                nmax=numnodes
+        nx.draw(gmax, with_labels=True)
+        print(gmax.nodes.data(True))
+        g=from_networkx(gmax)
+        print(g)
+        print()
+        print(g.y)
+        print(g.edge_index)
+        plt.show()
+        pg=None
+        nmax=0
+        for g in pg_graphs:
+            numnodes=g.num_nodes
+            if numnodes>nmax:
+                pg=copy.deepcopy(g)
+                nmax=numnodes
+
+        print('networkx graph')
+        print(pg)
+        print(pg.x)
+        print(pg.y)
+        print(pg.edge_index)
+        print('-----------------')
+        # Gather some statistics about the graph.
+        print(f'Number of nodes: {pg.num_nodes}') #Number of nodes in the graph
+        print(f'Number of edges: {pg.num_edges}') #Number of edges in the graph
+        print(f'Average node degree: {pg.num_edges / pg.num_nodes:.2f}') # Average number of nodes in the graph
+        print(f'Contains isolated nodes: {pg.has_isolated_nodes()}') #Does the graph contains nodes that are not connected
+        print(f'Contains self-loops: {pg.has_self_loops()}') #Does the graph contains nodes that are linked to themselves
+        print(f'Is undirected: {pg.is_undirected()}') #Is the graph an undirected graph
+        nx.draw(to_networkx(pg), with_labels=True)
+
+
+    # Convert each NetworkX graph to a PyTorch Geometric Data object
+    pg_graphs=[from_networkx(g) for g in graphs]
+    return pg_graphs
+
+
 
 # Define a function to pad a list with zeros
 def pad_list(lst, max_list_length):
