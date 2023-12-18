@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from OMTFGraphNetwork import OMTFGraphNetwork
 
 # Instantiate the network
-g=OMTFGraphNetwork()
+g=OMTFGraphNetwork() # Optionally pass a class name. The class must inherit from nn.Module. DO NOT PASS THE CONSTRUCTOR (the constructor is called via g.instantiate_model() below)
 
 #g.load_data('data/omtfAnalysis2.root:simOmtfPhase2Digis/OMTFHitsTree', fraction=0.05, viz=True)
 #g.load_data('data/Displaced_cTau5m_XTo2LLTo4Mu_condPhase2_realistic_l1omtf_12.root:simOmtfPhase2Digis/OMTFHitsTree', fraction=1., viz=True)
@@ -31,7 +31,7 @@ dotrain=True
 if not dotrain:
     g.load_model('models/model.pth')
 else:
-    g.instantiate_model() # pass parameters of the model here
+    g.instantiate_model() # pass parameters of the model here, if needed
     g.do_training(10)
 
 # Look at output plots
