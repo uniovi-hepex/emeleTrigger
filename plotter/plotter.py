@@ -1,9 +1,9 @@
 import os, re,sys
 from math import *
-import numpy as np
-from array import array
 import uproot
 import matplotlib.pyplot as plt
+import awkward as ak
+import pandas as pd
 
 from datasets import *
 from plots import *
@@ -27,7 +27,8 @@ class plotter(object):
             if self.options.verbose: print("Converting datasetlist to list")
             self.options.datasetlist = (self.options.datasetlist).split(",")
         for key in datasets:
-            if key in self.options.datasetlist:
+            if self.options.verbose: print("Checking dataset %s"%key)   
+            if key in self.options.datasetlist or self.options.datasetlist[0] == "all":
                 self.datasets[key] = datasets[key]
         self.ordereddatasets = self.options.datasetlist
 
@@ -45,25 +46,63 @@ class plotter(object):
         for dataset in self.datasets:
             if self.verbose: print("Loaded dataset %s"%dataset)
             branches = uproot.open("%s:%s" %(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"]))  
-            if self.verbose:  print(branches.show())
             branches=branches.arrays(library='pd')
             print('Downsampling...')
             self.df[dataset]=branches.sample(frac=self.options.fraction)
             print('Downsampling done')
     
-    def loadVariable(self, variable, df, selection, extraCuts):
+    def loadVariableFromDataset(self, plot, dataset):
+        variable = self.plots[plot]["variable"]
         cuts = ""
-        for var,sel in selection.items(): 
+        for sel in self.datasets[dataset]["selection"].values(): 
             cuts += "(%s) & "%sel
-        cuts += extraCuts
-        return df[variable][df.eval(cuts)]
+        cuts += self.plots[plot]["extra cuts"]
+        selection = self.df[dataset].eval(cuts)        
+        s = self.df[dataset][variable][selection]
+        if isinstance(s.values[0],ak.Array):
+            return pd.Series(ak.flatten(s.values))
+        else: 
+            return s
+        '''if isinstance(df[variable],ak.Array):
+            if self.verbose: print("Converting to pandas series") 
+            return ak.flatten(df[variable])[ak.flatten(selection)]
+        else:
+            return df[variable][selection]'''
+            
+    def plot1DHisto(self,series,plot,dataset):
+        fig, ax = plt.subplots()
+        series.plot(kind='hist', xlabel=plot["xlabel"], ylabel=plot["ylabel"], bins=plot["bins"], range=plot["xrange"], 
+                        label=dataset["label"], color=dataset["color"], logy=plot["logY"], logx=plot["logX"],histtype='step', 
+                        grid=plot["grid"],fill=False)
+        if dataset["label"] != "": ax.legend()
+        '''        
+try:
+            n, bins, patches = plt.hist(series, bins=plot["bins"], range=plot["xrange"], histtype='step', 
+                                        density=self.options.normalize, label=dataset["label"], color=dataset["color"])
+            ax.set_xlabel(plot["xlabel"])
+            ax.set_ylabel(plot["ylabel"])
+            if plot["logY"]:  ax.set_yscale('log')
+            if plot["logX"]:  ax.set_xscale('log')
+        except:
+            print('[WARNING] Cannot plot %s with matplotlib'%plot["xlabel"])
+'''
+        fig.tight_layout()
+        plt.show(block=False)
+        plt.savefig(plot["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset["name"]))
+        plt.close()
 
-    def doHistograms(self):
+    def plotHistograms(self):
         for plot in self.plots:
-            if self.verbose: print("Creating histogram %s"%plot)
             for dataset in self.datasets:
                 if self.verbose: print("Creating histogram %s for dataset %s"%(plot,dataset))
-                xvar = self.loadVariable(self.plots[plot]["variable"],self.df[dataset],self.datasets[dataset]["selection"],self.plots[plot]["extra cuts"])
+                if self.plots[plot]['type'] == '1D':    
+                    xvar = self.loadVariableFromDataset(plot,dataset)
+                    self.plot1DHisto(xvar,self.plots[plot],self.datasets[dataset])
+                elif self.plots[plot]['type'] == '2D':
+                    print('[WARNING] 2D plots not implemented yet')
+                    continue
+                    
+                '''
                 fig, ax = plt.subplots()
                 n, bins, patches = plt.hist(xvar, bins=self.plots[plot]["bins"], range=self.plots[plot]["xrange"], histtype='step', density=self.options.normalize, label=self.datasets[dataset]["label"], color=self.datasets[dataset]["color"])
                 ax.set_xlabel(self.plots[plot]["xlabel"])
@@ -74,13 +113,13 @@ class plotter(object):
                 fig.tight_layout()
                 plt.show(block=False)
                 plt.savefig(self.plots[plot]["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset))
-                plt.close()    
+                plt.close()'''
 
     def run(self):
         if self.verbose: print("Loading files....")
         self.loadFiles()
         if self.verbose: print("Initializating histograms....")
-        self.doHistograms()
+        self.plotHistograms()
         if self.verbose: print("Done!")
 
 #### ========= MAIN =======================
@@ -96,7 +135,7 @@ if __name__ == "__main__":
     parser.add_argument("--pdir"    , dest="pdir"      , type=str      , default="./output/"    , help="Where to put the plots into")
     parser.add_argument("-v","--verbose"  , dest="verbose"    , action="store_true", default=True         , help="If activated, print verbose output")
     parser.add_argument("-n","--normalize"  , dest="normalize"    , action="store_true", default=False         , help="Normalize histograms to unity")
-    parser.add_argument("-f","--fraction"   , dest="fraction"     , type=float      , default=0.01    , help="Donwnscale the dataset by this factor")
+    parser.add_argument("-f","--fraction"   , dest="fraction"     , type=float      , default=0.5    , help="Donwnscale the dataset by this factor")
 
     options = parser.parse_args()
 
