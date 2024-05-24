@@ -11,8 +11,7 @@ Contributors:
 
 
 To generate the proper environment: 
-'''
-python3.11 -m venv pyenv
+```python3.11 -m venv pyenv
 source <name_of_venv>/bin/activate
 pip install .
-'''
+```
