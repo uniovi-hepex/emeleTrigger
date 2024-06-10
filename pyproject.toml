@@ -25,10 +25,12 @@ packages = [
 python = "~3.11.0"
 awkward = "2.5.2"
 matplotlib = "3.8.2"
-numpy = "1.23.2"
+numpy = "1.23.4"
 pandas = "2.1.4"
 scipy = "1.10.1"
 uproot = "5.0.4"
+mplhep = "0.3.31"
+awkward-pandas = "^2023.8.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "23.12.1"
@@ -37,7 +39,6 @@ flake8 = "^7.0.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "7.4.3"
-
 
 [tool.poetry.scripts]
 plotter = "tools.plotter.plotter:main"

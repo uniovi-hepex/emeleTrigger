@@ -8,6 +8,12 @@ import pandas as pd
 from datasets import *
 from plots import *
 
+import mplhep as hep   
+plt.style.use(hep.style.CMS)
+plt.rcParams['figure.figsize'] = (6,4)
+plt.rcParams['figure.facecolor'] = 'white'
+plt.rcParams["font.size"] = 15
+
 class plotter(object):
     def __init__(self, options = None):
         self.verbose = options.verbose

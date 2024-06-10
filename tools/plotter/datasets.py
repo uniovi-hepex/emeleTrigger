@@ -1,4 +1,4 @@
-###Format:   ([List of files], IsData?)
+ ###Format:   ([List of files], IsData?)
 phedexPath = "./"
 
 files_SingleMu_FlatPt0To1000Dxy3m = (phedexPath + "data/SingleMu_GT131X_Extrapolation_GhostBusterTest_FlatPt0To1000Dxy3m_NonDegraded_Stub.root", "simOmtfDigis/OMTFHitsTree") # 
