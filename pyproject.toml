@@ -1,0 +1,65 @@
+ # pyproject.toml
+[build-system]
+build-backend = 'poetry.core.masonry.api'
+requires = [
+    "poetry-core~=1.0"
+]
+
+[tool.poetry]
+name = "emeleTrigger"
+version = "0.0.1"
+description = "Tools to train an prepare a GNN version."
+license = "MIT"
+authors = [
+    "Santiago Folgueras <santiago.folgueras@cern.ch>",
+    "Pietro Vischia <pietro.vischia@cern.ch>",
+    "Clara Ramon Alvarez <clara.ramon.alvarez@cern.ch>",
+    "Pelayo Leguina <pelayo.leguina.lopez@cern.ch>",
+]
+readme = "README.md"
+packages = [
+    { include = "tools" },
+]
+
+[tool.poetry.dependencies]
+python = "~3.11.0"
+awkward = "2.5.2"
+matplotlib = "3.8.2"
+numpy = "1.23.4"
+pandas = "2.1.4"
+scipy = "1.10.1"
+uproot = "5.0.4"
+mplhep = "0.3.31"
+awkward-pandas = "^2023.8.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "23.12.1"
+mypy = "1.8.0"
+flake8 = "^7.0.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "7.4.3"
+
+[tool.poetry.scripts]
+plotter = "tools.plotter.plotter:main"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    'ignore:A NumPy version',
+]
+pythonpath = [
+    "src"
+]
+testpaths = [
+    "tests",
+]
+[tool.mypy]
+files = [
+    "tools"
+]
+disable_error_code = [
+    "import-untyped",
+    "index"
+]
