@@ -35,6 +35,7 @@ class plotter(object):
     def filterPlots(self):
         self.plots = {}
         for key in plots:
+            print(self.options.plotThis)
             if re.match(self.options.plotThis, key):
                 if "executer" in plots[key].keys() and not(type(self).__name__ == plots[key]["executer"]):
                     print("[WARNING] Plot %s being skipped by executer==%s configuration option"%(key, plots[key]["executer"]))
@@ -51,14 +52,34 @@ class plotter(object):
             self.df[dataset]=branches.sample(frac=self.options.fraction)
             print('Downsampling done')
     
+    def loadVariableFromDataset_tonumpy(self, plot, dataset,index):
+        variable = self.plots[plot]["variable"][index]
+        cuts = ""
+        print(variable)
+        for sel in self.datasets[dataset]["selection"].values(): 
+            cuts += "(%s) & "%sel
+        if "()" in cuts or "(True)" in cuts:
+           s = self.df[dataset][variable]
+        else:
+           cuts += self.plots[plot]["extra cuts"]
+           selection = self.df[dataset].eval(cuts) 
+           s = self.df[dataset][variable][selection]
+
+        s_nparr = s.to_numpy()
+        return s_nparr
+        
     def loadVariableFromDataset(self, plot, dataset):
         variable = self.plots[plot]["variable"]
         cuts = ""
         for sel in self.datasets[dataset]["selection"].values(): 
             cuts += "(%s) & "%sel
-        cuts += self.plots[plot]["extra cuts"]
-        selection = self.df[dataset].eval(cuts)        
-        s = self.df[dataset][variable][selection]
+        if "()" in cuts or "(True)" in cuts:
+           print(variable)
+           s = self.df[dataset][variable]
+        else:
+           cuts += self.plots[plot]["extra cuts"]
+           selection = self.df[dataset].eval(cuts) 
+           s = self.df[dataset][variable][selection]
         if isinstance(s.values[0],ak.Array):
             return pd.Series(ak.flatten(s.values))
         else: 
@@ -71,6 +92,7 @@ class plotter(object):
             
     def plot1DHisto(self,series,plot,dataset):
         fig, ax = plt.subplots()
+        print(type(series))
         series.plot(kind='hist', xlabel=plot["xlabel"], ylabel=plot["ylabel"], bins=plot["bins"], range=plot["xrange"], 
                         label=dataset["label"], color=dataset["color"], logy=plot["logY"], logx=plot["logX"],histtype='step', 
                         grid=plot["grid"],fill=False)
@@ -90,6 +112,21 @@ try:
         plt.show(block=False)
         plt.savefig(plot["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset["name"]))
         plt.close()
+        
+    def plot2DHisto(self,xarry, yarray,plot,dataset):
+        fig, ax = plt.subplots()
+        bins=plot["bins"]
+        range=plot["range"]
+        print(xarry)
+        print("y")
+        print(yarray)
+        plt.hist2d(xarry,yarray,bins,range)
+        plt.colorbar()
+        ax.set_xlabel(plot["xlabel"])
+        ax.set_ylabel(plot["ylabel"])
+        plt.show(block=False)
+        plt.savefig(plot["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset["name"]))
+        plt.close()
 
     def plotHistograms(self):
         for plot in self.plots:
@@ -99,7 +136,10 @@ try:
                     xvar = self.loadVariableFromDataset(plot,dataset)
                     self.plot1DHisto(xvar,self.plots[plot],self.datasets[dataset])
                 elif self.plots[plot]['type'] == '2D':
-                    print('[WARNING] 2D plots not implemented yet')
+                    xvar = self.loadVariableFromDataset_tonumpy(plot,dataset,0)
+                    yvar = self.loadVariableFromDataset_tonumpy(plot,dataset,1)
+                    self.plot2DHisto(xvar,yvar, self.plots[plot],self.datasets[dataset])
+                    #print('[WARNING] 2D plots not implemented yet')
                     continue
                     
                 '''

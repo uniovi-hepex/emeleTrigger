@@ -42,7 +42,7 @@ class OMTFGraphNetwork():
         self.branches=None
         self.pg_graphs=None
 
-        self.NUM_PROCESSORS = 6
+        self.NUM_PROCESSORS = 3
         self.NUM_PHI_BINS = 5400
         self.HW_ETA_TO_ETA_FACTOR=0.010875
         #self.HwEtaToEta conversion: 0.010875
@@ -61,9 +61,9 @@ class OMTFGraphNetwork():
         self.LOGIC_LAYERS_LABEL_MAP={
                 #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
                 # Put here catalog of names0
-                0: 'RB1',
-                2: 'RB2',
-                4: 'RB3',
+                0: 'MB1',
+                2: 'MB2',
+                4: 'MB3',
                 6: 'ME1/3',
                 7: 'ME2/2',
                 8: 'ME3/2',
@@ -80,7 +80,7 @@ class OMTFGraphNetwork():
         print('Downsampling done')
         # Calculate deltaphis between layers, adding it to a new column
         # this will be our proxy to the magnetic field
-        self.branches['stubDPhi'] = self.branches['stubPhi'].apply(lambda x: np.diff(x))
+        self.branches['stubDPhi'] = self.branches['stubPhi'].apply(lambda x: np.diff(x)) #NEW: we can read this directly now with if TO DO
 
         print(self.branches.head())
 
@@ -90,7 +90,7 @@ class OMTFGraphNetwork():
         print('Graphs created', len(self.pg_graphs))
         # Once it's shuffled, we slice the data to split
         self.train_dataset = self.pg_graphs[:int(121/2)]
-        self.test_dataset  = self.pg_graphs[int(121/2):]
+        self.test_dataset  = self.pg_graphs[int(121/2):] #TO DO fix this
 
         #for d in train_dataset:
         #    d.to(torch.device("mps"))
