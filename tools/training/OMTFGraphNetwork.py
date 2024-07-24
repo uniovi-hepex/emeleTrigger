@@ -42,7 +42,7 @@ class OMTFGraphNetwork():
         self.branches=None
         self.pg_graphs=None
 
-        self.NUM_PROCESSORS = 6
+        self.NUM_PROCESSORS = 3
         self.NUM_PHI_BINS = 5400
         self.HW_ETA_TO_ETA_FACTOR=0.010875
         #self.HwEtaToEta conversion: 0.010875
@@ -61,9 +61,9 @@ class OMTFGraphNetwork():
         self.LOGIC_LAYERS_LABEL_MAP={
                 #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
                 # Put here catalog of names0
-                0: 'RB1',
-                2: 'RB2',
-                4: 'RB3',
+                0: 'MB1',
+                2: 'MB2',
+                4: 'MB3',
                 6: 'ME1/3',
                 7: 'ME2/2',
                 8: 'ME3/2',
@@ -81,6 +81,7 @@ class OMTFGraphNetwork():
         # Calculate deltaphis between layers, adding it to a new column
         # this will be our proxy to the magnetic field
         self.branches['stubDPhi'] = self.branches['stubPhi'].apply(lambda x: np.diff(x))
+        self.branches['stubDEta'] = self.branches['stubEta'].apply(lambda x: np.diff(x))
 
         print(self.branches.head())
 
@@ -99,9 +100,9 @@ class OMTFGraphNetwork():
         self.train_loader = DataLoader(self.train_dataset, batch_size=bsize, shuffle=True)
         self.test_loader  = DataLoader(self.test_dataset, batch_size=bsize, shuffle=True)
 
-    def _get_stub_r(self, stubTypes, stubDetIds, stubEtas, stubLogicLayers):
+    def _get_stub_r(self, stubTypes, stubEtas, stubLogicLayers):
         rs=[]
-        for stubType, stubDetId, stubEta, stubLogicLayer in zip(stubTypes, stubDetIds, stubEtas, stubLogicLayers):
+        for stubType, stubEta, stubLogicLayer in zip(stubTypes, stubEtas, stubLogicLayers):
             r=None
             if stubType == 3: # DTs
                 if stubLogicLayer==0:
@@ -140,7 +141,7 @@ class OMTFGraphNetwork():
         for index, cloud in enumerate(self.sky):
             graph = nx.DiGraph()
             nodes = []
-            keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer']
+            keep=['stubR', 'stubEta', 'stubPhi','stubPhiB', 'stubPhiDist', 'stubEtaDist', 'stubQuality', 'stubBx', 'stubType', 'stubTiming', 'stubLogicLayer']
             edges=[]
             #print('Index of sky', index, ', cloud has size', len(cloud))
             for idx, row in cloud.iterrows(): # build edges based on stubLayer
@@ -160,8 +161,8 @@ class OMTFGraphNetwork():
 
     def convert_to_graphs(self, viz=False):
         self.get_stub_r = np.vectorize(self._get_stub_r)
-        self.branches['stubR'] = self.get_stub_r(self.branches['stubType'], self.branches['stubDetId'], self.branches['stubEta'], self.branches['stubLogicLayer'])
-        keep=['stubR', 'stubEta', 'stubPhi', 'stubProc', 'stubPhiB', 'stubEtaSigma', 'stubQuality', 'stubBx', 'stubDetId', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
+        self.branches['stubR'] = self.get_stub_r(self.branches['stubType'], self.branches['stubEta'], self.branches['stubLogicLayer'])
+        keep=['stubR', 'stubEta', 'stubPhi','stubPhiB', 'stubPhiDist', 'stubEtaDist', 'stubQuality', 'stubBx', 'stubType', 'stubTiming', 'stubLogicLayer', 'muonPt']
         self.sky=[]
         for index, row in self.branches.iterrows():
             # Here now I need to enrich this with the stublogiclayer etc, for the edges
