@@ -216,12 +216,12 @@ plots = {
                     'type'       : '1D',
     },
     'omtfRefHitNum' : {'variable'   : 'omtfRefHitNum',
-                    'bins'       : 100,  # can be a number or a list of bin edges
+                    'bins'       : 20,  # can be a number or a list of bin edges
                     'extra cuts' : 'True', # Applied at per object level only in this plot
                     #Plotting thingies
                     'xlabel'     : 'OMTF RefHitNum',
                     'ylabel'     : 'Yields',
-                    'xrange'     : [0,100],
+                    'xrange'     : [-0.5,19.5],
                     'ExtraSpam'  :  "",
                     'logY'       : False,
                     'logX'       : False,
@@ -301,7 +301,7 @@ plots = {
                     'logY'       : False,
                     'logX'       : False,
                     'grid'       : True,
-                    'savename'   : '[PDIR]/[DATASET]/Observables/stubPhiDist',
+                    'savename'   : '[PDIR]/[DATASET]/Observables/stubPhiB',
                     'executer'   : 'plotter', # Safeguard to not run the plot outside of what was designed for it
                     'type'       : '1D',
     },
@@ -320,6 +320,21 @@ plots = {
                     'executer'   : 'plotter', # Safeguard to not run the plot outside of what was designed for it
                     'type'       : '1D',
     },
+    'stubPhiDist' : {'variable'   : 'stubPhiDist',
+                      'bins'       : 100,
+                      'extra cuts' : 'True',
+                      'xlabel'     : 'stubEtaDist',
+                      'ylabel'     : 'Yields',
+                      'xrange'     : [-100,100],
+                      'ExtraSpam'  :  "",
+                      'logY'       : False,
+                      'logX'       : False,
+                      'grid'       : True,
+                      'savename'   : '[PDIR]/[DATASET]/Observables/stubPhiDist',
+                      'executer'   : 'plotter',
+                      'type'       : '1D',
+    },
+
     'stubEtaDist' : {'variable'   : 'stubEtaDist',
                       'bins'       : 100,
                       'extra cuts' : 'True',

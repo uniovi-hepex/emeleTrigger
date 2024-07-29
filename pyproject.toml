@@ -31,6 +31,7 @@ scipy = "1.10.1"
 uproot = "5.0.4"
 mplhep = "0.3.31"
 awkward-pandas = "^2023.8.0"
+torch = "^2.3.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "23.12.1"
