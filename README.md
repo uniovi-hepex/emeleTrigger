@@ -18,3 +18,10 @@ pip install .
 ```
 
 If you have python 3.11 already installed in your system, you can also run `python3.11 -m venv pyenv` instead of the `virtualenv` command above.
+
+Dependencies and requirements: 
+The list of dependencies can be seen in requirements.txt and installed by runing: 
+
+``` 
+pip install -r requirements.txt
+```
