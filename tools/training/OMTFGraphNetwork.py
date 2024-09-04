@@ -313,4 +313,3 @@ class OMTFGraphNetwork():
         plt.xlabel("Muon pT")
         plt.savefig('pred_1d.png')
         print("one d created")
-

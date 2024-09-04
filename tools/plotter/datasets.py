@@ -1,4 +1,3 @@
-<<<<<<< HEAD
  ###Format:   ([List of files], IsData?)
 phedexPath = "./../../data"
 
@@ -15,4 +14,3 @@ datasets = {
                                  } 
                                 },
 }
->>>>>>> ea7051042f83fc84eada9dc7579689295af853ac
