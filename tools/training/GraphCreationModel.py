@@ -14,7 +14,8 @@ plt.close()
 
 plt.style.use(hep.style.CMS)
 plt.rcParams["figure.facecolor"] = "white"
-
+plt.rcParams["axes.titlesize"] = 10  # Ajustar el tamaño del título de los ejes
+plt.rcParams["axes.labelsize"] = 10  # Ajustar el tamaño de las etiquetas de los ejes
 
 class GraphCreationModel(): 
     def __init__(self, data_path, graph_save_paths, model_connectivity):
@@ -282,6 +283,8 @@ class GraphCreationModel():
         plt.tight_layout()
         plt.show()
         plt.savefig(savefig)
+        plt.close()  # Cerrar la gráfica automáticamente
+
 
     def draw_example_graphs(self,savefig="graph.png",seed=42):
         print('Drawing example graphs into ', savefig)
@@ -304,7 +307,8 @@ class GraphCreationModel():
         plt.tight_layout()
         plt.show()
         plt.savefig(savefig)
-    
+        plt.close()  # Cerrar la gráfica automáticamente
+
     def verifyGraphs(self):
         print('Verifying graphs, checking connectivity')
         for G in self.graphs:
@@ -351,22 +355,24 @@ class GraphCreationModel():
 
 
 def main():
-    graphs = GraphCreationModel("./data/Dumper_l1omtf_001.root:simOmtfPhase2Digis/OMTFHitsTree", "vix_graph_ALL_layers_onlypt.pkl", "all")
+    '''graphs = GraphCreationModel("./data/Dumper_l1omtf_001.root:simOmtfPhase2Digis/OMTFHitsTree", "vix_graph_ALL_layers_onlypt.pkl", "all")
     graphs.set_muon_vars(['muonQPt'])
     graphs.load_data()
     graphs.convert_to_graph()
     graphs.draw_example_graphs("graph_example_ALLlayers.png")
     graphs.verifyGraphs()
     graphs.saveTorchDataset()
+'''
 
-'''    
-    graphs_3layer = GraphCreationModel("./data/Dumper_l1omtf_001.root:simOmtfPhase2Digis/OMTFHitsTree", "vix_graph_3_layers.pkl", "3")
+    graphs_3layer = GraphCreationModel("./data/Dumper_l1omtf_001.root:simOmtfPhase2Digis/OMTFHitsTree", "vix_graph_3_layers_onlypt.pkl", "3")
+    graphs_3layer.set_muon_vars(['muonQPt'])
+
     graphs_3layer.load_data()
     graphs_3layer.convert_to_graph()
     graphs_3layer.draw_example_graphs("graph_example_3_layers.png")
     graphs_3layer.verifyGraphs()
     graphs_3layer.saveTorchDataset()
-'''
+
 
 if __name__ == "__main__":
     main()
