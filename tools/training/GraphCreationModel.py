@@ -262,7 +262,8 @@ class GraphCreationModel():
                                             
                         # Añadir arista usando etiquetas de stubLayer
                         G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhi'][stubId],row['stubPhi'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]))
-            self.graphs.append(G)
+            if row["muonQPt"] != 0:
+                self.graphs.append(G)
         print('Graphs created and stored')
 
     def getGraphWithNodes(self,nodes):
