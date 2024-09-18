@@ -61,8 +61,7 @@ class TrainModelFromGraph:
 
         # Filter for .pkl files
         pkl_files = [f for f in all_files if f.endswith('.pkl')]
-        print("Using files:")
-        print(pkl_files)
+        print(f"Using files:" {pkl_files})
         if not pkl_files:
             print("No .pkl files found in the directory.")
             return []
@@ -86,6 +85,8 @@ class TrainModelFromGraph:
         train_dataset = Graphs_for_training_reduced[:ntrain]
         test_dataset = Graphs_for_training_reduced[ntrain:ntrain * 2]
 
+        print("====================================")
+        print("Example of data:")
         print(train_dataset[0].x)
         print(train_dataset[0].edge_index)
         print(train_dataset[0].edge_attr)
@@ -93,7 +94,8 @@ class TrainModelFromGraph:
         print(train_dataset[0].deltaEta)
         print(train_dataset[0].y)
         print(train_dataset[0].batch)
-
+        print("====================================")
+        
         # Load data
         self.train_loader = DataLoader(train_dataset, batch_size=self.BatchSize, shuffle=True)
         self.test_loader = DataLoader(test_dataset, batch_size=self.BatchSize, shuffle=False)
@@ -104,6 +106,7 @@ class TrainModelFromGraph:
         hidden_dim = self.BatchSize
         output_dim = 3
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"Using device: {self.device}")
         self.model = GATRegressor(num_node_features, num_edge_features, hidden_dim, output_dim)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.LearningRate, weight_decay=0.75)
         print("Model initialized")

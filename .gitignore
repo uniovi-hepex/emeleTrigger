@@ -8,3 +8,8 @@ __pycache__
 *.png
 .DS_Store
 pyenv
+
+# Trained models & graphs
+*.pkl
+*.pt
+*.pth
