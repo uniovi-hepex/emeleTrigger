@@ -61,7 +61,7 @@ class TrainModelFromGraph:
 
         # Filter for .pkl files
         pkl_files = [f for f in all_files if f.endswith('.pkl')]
-        print(f"Using files:" {pkl_files})
+        print(f"Using files: {pkl_files}")
         if not pkl_files:
             print("No .pkl files found in the directory.")
             return []
@@ -95,7 +95,7 @@ class TrainModelFromGraph:
         print(train_dataset[0].y)
         print(train_dataset[0].batch)
         print("====================================")
-        
+
         # Load data
         self.train_loader = DataLoader(train_dataset, batch_size=self.BatchSize, shuffle=True)
         self.test_loader = DataLoader(test_dataset, batch_size=self.BatchSize, shuffle=False)
@@ -220,16 +220,34 @@ class PlotRegresson:
         plt.savefig(os.path.join(output_dir, "phi_regression.png"))
         plt.clf()
 
+def main():
 
-# For training:
-trainer = TrainModelFromGraph(Graph_path='graph_folder', Out_path='Bsize_gmp_64_lr5e-4', BatchSize=64, LearningRate=0.0005, Epochs=1000)
-trainer.Training_loop()
+    parser = argparse.ArgumentParser(description="Train and evaluate GAT model")
+    parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
+    parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v2', help='Output path for the results')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
+    parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate for training')
+    parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
+    parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4/model_1000.pth', help='Path to the saved model for evaluation')
+    parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v2', help='Output directory for evaluation results')
+    parser.add_argument('--train', action='store_true', help='Train the model')
 
-# For evaluating:
-trainer.load_data()
-test_loader = trainer.test_loader
-model = torch.load('Bsize_gmp_64_lr5e-4/model_1000.pth')
+    args = parser.parse_args()
 
-evaluator = PlotRegresson(model, test_loader, batch_size=64)
-evaluator.evaluate()
-evaluator.plot_regression(output_dir="Bsize_gmp_64_lr5e-4")
+
+    # For training:
+    trainer = TrainModelFromGraph(Graph_path=args.graph_path, Out_path=args.out_path, BatchSize=args.batch_size, LearningRate=args.learning_rate, Epochs=args.epochs)
+    if args.train:
+        trainer.Training_loop()
+
+    # For evaluating:
+    trainer.load_data()
+    test_loader = trainer.test_loader
+    model = torch.load(args.model_path)
+        
+    evaluator = PlotRegresson(model, test_loader, batch_size=args.batch_size)
+    evaluator.evaluate()
+    evaluator.plot_regression(output_dir=args.output_dir)
+
+if __name__ == "__main__":
+    main()
