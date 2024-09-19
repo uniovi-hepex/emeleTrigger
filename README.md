@@ -25,3 +25,8 @@ The list of dependencies can be seen in requirements.txt and installed by runing
 ``` 
 pip install -r requirements.txt
 ```
+
+In Lxplus, this line seems to have all the required dependencies
+```
+source /cvmfs/sft.cern.ch/lcg/views/LCG_106_cuda/x86_64-el9-gcc11-opt/setup.sh
+```
