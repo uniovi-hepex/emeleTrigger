@@ -65,7 +65,6 @@ class GraphCreationModel():
 
         ##  filter out the dataset:
         self.dataset = self.dataset[self.keep_branches]
-        print(self.dataset)
         
        
     def add_auxiliary_info(self, dataset):
@@ -356,25 +355,64 @@ class GraphCreationModel():
 
 
 def main():
-    '''graphs = GraphCreationModel("./data/Dumper_l1omtf_001.root:simOmtfPhase2Digis/OMTFHitsTree", "vix_graph_ALL_layers_onlypt.pkl", "all")
-    graphs.set_muon_vars(['muonQPt'])
+    
+    import argparse
+    parser = argparse.ArgumentParser(description="Graph Creation model")
+    parser.add_argument("--data_path", type=str, default=None, help="Path to the data file")
+    parser.add_argument("--graph_save_paths", type=str, default=None, help="Path to save the graph")
+    parser.add_argument("--model_connectivity", type=str, default="all", help="Model connectivity")
+    parser.add_argument("--muon_vars", type=str, default="muonQPt", help="Muon variables")
+    parser.add_argument("--stub_vars", type=str, default="stubEtaG", help="Stub variables")
+    # add parser for validation
+    parser.add_argument('--validate', action='store_true', help='Validate the model')
+                        
+    args = parser.parse_args()
+
+    graphs = GraphCreationModel(args.data_path, args.graph_save_paths, args.model_connectivity)
+    graphs.set_muon_vars([args.muon_vars])
     graphs.load_data()
     graphs.convert_to_graph()
-    graphs.draw_example_graphs("graph_example_ALLlayers.png")
-    graphs.verifyGraphs()
+    if args.validate:
+        graphs.draw_example_graphs("graph_example_ALLlayers.png")
+        graphs.verifyGraphs()
     graphs.saveTorchDataset()
-'''
 
-    graphs_3layer = GraphCreationModel("./data/Dumper_l1omtf_001.root:simOmtfPhase2Digis/OMTFHitsTree", "vix_graph_3_layers_onlypt.pkl", "3")
-    graphs_3layer.set_muon_vars(['muonQPt'])
+    '''
+    import sys, os
+    FOLDER = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/"
+    GRAPH_FOLDER = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725/"
 
-    graphs_3layer.load_data()
-    graphs_3layer.convert_to_graph()
-    graphs_3layer.draw_example_graphs("graph_example_3_layers.png")
-    graphs_3layer.verifyGraphs()
-    graphs_3layer.saveTorchDataset()
+    # do a check if the folder exists and ls the files
+    # if not, exit
+    if not os.path.exists(FOLDER):
+        print("Folder does not exist")
+        sys.exit()
+    list_of_files = os.listdir(FOLDER)
+
+    print("List of files in the folder: ", list_of_files)
 
 
+    i = 1
+    for file in list_of_files:
+        print("Processing file: ", file)
+        graphs = GraphCreationModel("%s/%s:simOmtfPhase2Digis/OMTFHitsTree" %(FOLDER,file), "vix_graph_ALL_layers_15Oct_onlypt_%03d.pkl" %(i), "all")
+        graphs.set_muon_vars(['muonQPt'])
+        graphs.load_data()
+        graphs.convert_to_graph()
+        #graphs.draw_example_graphs("graph_example_ALLlayers.png")
+        #graphs.verifyGraphs()
+        graphs.saveTorchDataset()
+
+        graphs_3layer = GraphCreationModel("%s/%s:simOmtfPhase2Digis/OMTFHitsTree" %(FOLDER,file), "vix_graph_3_layers_15Oct_onlypt_%03d.pkl" %(i), "3")
+        graphs_3layer.set_muon_vars(['muonQPt'])
+        graphs_3layer.load_data()
+        graphs_3layer.convert_to_graph()
+        #graphs_3layer.draw_example_graphs("graph_example_3_layers.png")
+        #graphs_3layer.verifyGraphs()
+        graphs_3layer.saveTorchDataset()
+        i += 1
+    '''
+    
 if __name__ == "__main__":
     main()
    
