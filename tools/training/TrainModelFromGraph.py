@@ -50,7 +50,7 @@ class TrainModelFromGraph:
 
         self.train_loader = None
         self.test_loader = None
-        self.device = None
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = None
         self.optimizer = None
         self.loss_fn = torch.nn.MSELoss()
@@ -106,9 +106,8 @@ class TrainModelFromGraph:
         num_edge_features = 2
         hidden_dim = self.BatchSize
         output_dim = 3
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
-        self.model = GATRegressor(num_node_features, num_edge_features, hidden_dim, output_dim)
+        self.model = GATRegressor(num_node_features, num_edge_features, hidden_dim, output_dim).to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.LearningRate, weight_decay=0.75)
         print("Model initialized")
         print(self.model)
@@ -118,6 +117,7 @@ class TrainModelFromGraph:
         total_loss = 0
         i = 0
         for data in self.train_loader:
+            data = data.to(self.device)  # Mueve los datos al dispositivo
             self.optimizer.zero_grad()
             out = self.model(data)
             # loss = self.loss_fn(out, data.y.reshape(self.BatchSize,3))
@@ -134,6 +134,7 @@ class TrainModelFromGraph:
             self.model.eval()
             total_loss = 0
             for data in self.test_loader:
+                data = data.to(self.device)
                 out = self.model(data)
                 # loss = self.loss_fn(out, data.y.reshape(self.BatchSize,3))
                 loss = self.loss_fn(out, data.y.view(out.size()))
@@ -174,6 +175,7 @@ class PlotRegresson:
         self.model = model
         self.test_loader = test_loader
         self.batch_size = batch_size
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.pt_pred_arr = []
         self.eta_pred_arr = []
         self.phi_pred_arr = []
@@ -184,6 +186,7 @@ class PlotRegresson:
     def evaluate(self):
         with torch.no_grad():
             for data in self.test_loader:
+                data = data.to(self.device)
                 batch = data.batch
                 pred = self.model(data).reshape(self.batch_size, 3)
 
@@ -232,6 +235,7 @@ def main():
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--train', action='store_true', help='Train the model')
+    parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
 
     args = parser.parse_args()
 
@@ -242,13 +246,14 @@ def main():
         trainer.Training_loop()
 
     # For evaluating:
-    trainer.load_data()
-    test_loader = trainer.test_loader
-    model = torch.load(args.model_path)
-        
-    evaluator = PlotRegresson(model, test_loader, batch_size=args.batch_size)
-    evaluator.evaluate()
-    evaluator.plot_regression(output_dir=args.output_dir)
+    if args.evaluate:    
+        trainer.load_data()
+        test_loader = trainer.test_loader
+        model = torch.load(args.model_path)
+            
+        evaluator = PlotRegresson(model, test_loader, batch_size=args.batch_size)
+        evaluator.evaluate()
+        evaluator.plot_regression(output_dir=args.output_dir)
 
 if __name__ == "__main__":
     main()
