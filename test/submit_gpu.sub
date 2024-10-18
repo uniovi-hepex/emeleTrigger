@@ -1,0 +1,12 @@
+executable              = /afs/cern.ch/user/f/folguera/tmp/example_job.sh
+arguments               = $(ClusterId)$(ProcId)
+output                  = /afs/cern.ch/user/f/folguera/tmp/batchlogs/$(ClusterId).$(ProcId).out
+error                   = /afs/cern.ch/user/f/folguera/tmp/batchlogs/$(ClusterId).$(ProcId).err
+log                     = /afs/cern.ch/user/f/folguera/tmp/batchlogs/$(ClusterId).log
+on_exit_remove          = (ExitBySignal == False) && (ExitCode == 0)
+max_retries             = 5
+requirements            = Machine =!= LastRemoteHost
+request_gpus            = 1
++JobFlavour = "workday"
+
+queue
