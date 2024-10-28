@@ -9,8 +9,10 @@ __pycache__
 .DS_Store
 pyenv
 pyenv_win
+*.lock
 
 # Trained models & graphs
 *.pkl
 *.pt
 *.pth
+
