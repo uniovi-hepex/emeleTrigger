@@ -10,35 +10,7 @@ import os, sys
 
 import argparse
 import matplotlib.pyplot as plt
-
-
-class GATRegressor(torch.nn.Module):
-    def __init__(self, num_node_features, num_edge_features, hidden_dim, output_dim=3):
-        super(GATRegressor, self).__init__()
-        self.conv1 = GATConv(num_node_features, hidden_dim)
-        self.conv2 = GATConv(hidden_dim, hidden_dim)
-        self.fc1 = torch.nn.Linear(hidden_dim * 2, output_dim)
-
-    def forward(self, data):
-        # load nodel attributes: x, and edge attributes: deltaPhi and deltaEta
-        x, edge_index, deltaPhi, deltaEta, batch = data.x.float(), data.edge_index, data.deltaPhi.float(), data.deltaEta.float(), data.batch
-
-        # Combine deltaPhi and deltaEta into edge_attr
-        edge_attr = torch.stack([deltaPhi, deltaEta], dim=1)
-        # Apply graph convolutions
-        x = F.relu(x)
-        x = self.conv1(x, edge_index, edge_attr=edge_attr)  # Using GAT as it allow to use edge attributes
-        x = F.relu(x)
-        x = self.conv2(x, edge_index, edge_attr=edge_attr)
-
-        # Global mean pooling to get graph-level output
-        # x = gmp(x, batch)
-        x = torch.cat([gmp(x, batch), gap(x, batch)], dim=1)
-
-        # Fully connected layers for regression
-        x = self.fc1(x)
-        return x
-
+from models import GATRegressor,GATv2Regressor
 
 class TrainModelFromGraph:
     def __init__(self, Graph_path, Out_path, BatchSize, LearningRate, Epochs):
@@ -54,7 +26,7 @@ class TrainModelFromGraph:
         self.model = None
         self.optimizer = None
         self.loss_fn = torch.nn.MSELoss()
-
+    
     def load_data(self):
         # Loading data from graph and convert it to DataLoader
         Allgraphs = []
