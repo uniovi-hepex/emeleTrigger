@@ -13,13 +13,22 @@ import matplotlib.pyplot as plt
 from models import GATRegressor,GATv2Regressor
 
 class TrainModelFromGraph:
-    def __init__(self, Graph_path, Out_path, BatchSize, LearningRate, Epochs):
-        self.Graph_path = Graph_path
-        self.Out_path = Out_path
-        self.BatchSize = BatchSize
-        self.LearningRate = LearningRate
-        self.Epochs = Epochs
-
+    def __init__(self, **kwargs):
+        self.graph_path = kwargs.get('graph_path', 'graph_folder')
+        self.out_path = kwargs.get('out_path', 'Bsize_gmp_64_lr5e-4_v3')
+        self.batch_size = kwargs.get('batch_size', 64)
+        self.learning_rate = kwargs.get('learning_rate', 0.0005)
+        self.epochs = kwargs.get('epochs', 1000)
+        self.model_path = kwargs.get('model_path', None)
+        self.output_dir = kwargs.get('output_dir', None)
+        self.train = kwargs.get('train', False)
+        self.evaluate = kwargs.get('evaluate', False)
+        self.model = kwargs.get('model', 'GAT')
+        self.normalize_features = kwargs.get('normalize_features', False)
+        self.normalize_targets = kwargs.get('normalize_targets', False)
+        self.normalize_edge_features = kwargs.get('normalize_edge_features', False)
+        
+        # Inicializa otros atributos y carga los datos aquí
         self.train_loader = None
         self.test_loader = None
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -30,7 +39,7 @@ class TrainModelFromGraph:
     def load_data(self):
         # Loading data from graph and convert it to DataLoader
         Allgraphs = []
-        all_files = os.listdir(self.Graph_path)
+        all_files = os.listdir(self.graph_path)
 
         # Filter for .pkl files
         pkl_files = [f for f in all_files if f.endswith('.pkl')]
@@ -39,7 +48,7 @@ class TrainModelFromGraph:
             print("No .pkl files found in the directory.")
             return []
         for pkl_file in pkl_files:
-            file_path = os.path.join(self.Graph_path, pkl_file)
+            file_path = os.path.join(self.graph_path, pkl_file)
             with open(file_path, 'rb') as file:
                 graphfile = torch.load(file)
                 Allgraphs.append(graphfile)
@@ -51,10 +60,18 @@ class TrainModelFromGraph:
         for i in range(0, len(Graphs_for_training)):
             Graphs_for_training_reduced[i].y = Graphs_for_training[i].y.mean(dim=0)
 
+        # Filter out graphs with no nodes
+        Graphs_for_training_filtered = [g for g in Graphs_for_training_reduced if g.edge_index.size(1) > 0]  # remove empty graphs
+
         # Train and test split:
-        events = len(Graphs_for_training_reduced)
+        events = len(Graphs_for_training_filtered)
         ntrain = int((events * 0.7) / self.BatchSize) * self.BatchSize  # to have full batches
         print(f"Training events: {ntrain}")
+
+        # put deltaPhi and deltaEta in the data object as edge_attr
+        for i in range(0, len(Graphs_for_training_filtered)):
+            Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)
+
         train_dataset = Graphs_for_training_reduced[:ntrain]
         test_dataset = Graphs_for_training_reduced[ntrain:ntrain * 2]
 
@@ -72,6 +89,53 @@ class TrainModelFromGraph:
         # Load data
         self.train_loader = DataLoader(train_dataset, batch_size=self.BatchSize, shuffle=True)
         self.test_loader = DataLoader(test_dataset, batch_size=self.BatchSize, shuffle=False)
+        
+    def plot_graph_features(self, data_loader):
+        feature_names = ["eta", "phi", "R", "layer", "Type"]
+        for batch in data_loader:
+            features = batch.x.numpy()
+            regression = batch.y.numpy()
+            deltaphi = batch.deltaPhi.numpy() 
+            deltaeta = batch.deltaEta.numpy()
+            num_features = features.shape[1]
+
+            fig, axs = plt.subplots(3, 3, figsize=(15, 15))
+            axs = axs.flatten()
+                
+            # Plot node features
+            for i in range(num_features):
+                nbins = 18 if i==3 else 30
+                axs[i].hist(features[:, i], bins=nbins, alpha=0.75)
+                axs[i].set_title(f'Feature {feature_names[i]} Histogram')
+                axs[i].set_xlabel(f'Feature {feature_names[i]} Value')
+                axs[i].set_ylabel('Frequency')
+                
+            #calculate the average number of edges, dividing by the number of nodes
+            num_edges = batch.edge_index.size(1)/batch.x.size(0)
+            axs[num_features].hist(num_edges, bins=30, alpha=0.75)
+            axs[num_features].set_title('Number of Edges/Node')
+            axs[num_features].set_ylabel('Count')
+                
+            # Plot edge features
+            axs[num_features + 1].hist(deltaphi, bins=30, alpha=0.75)
+            axs[num_features + 1].set_title(f'Edge Feature deltaPhi Histogram')
+            axs[num_features + 1].set_xlabel(f'Edge Feature deltaPhi Value')
+            axs[num_features + 1].set_ylabel('Frequency')
+                
+            axs[num_features + 2].hist(deltaeta, bins=30, alpha=0.75)
+            axs[num_features + 2].set_title(f'Edge Feature deltaEta Histogram')
+            axs[num_features + 2].set_xlabel(f'Edge Feature deltaEta Value')
+            axs[num_features + 2].set_ylabel('Frequency')
+
+            # Plot regression target
+            axs[num_features + 3].hist(regression, bins=30, alpha=0.75)
+            axs[num_features + 3].set_title('Regression Target Histogram')
+            axs[num_features + 3].set_xlabel('Regression Target Value')
+            axs[num_features + 3].set_ylabel('Frequency')
+                
+            plt.tight_layout()
+            plt.show()
+            break  # Only draw the first batch
 
     def initialize_model(self):
         num_node_features = 5
@@ -79,7 +143,13 @@ class TrainModelFromGraph:
         hidden_dim = self.BatchSize
         output_dim = 3
         print(f"Using device: {self.device}")
-        self.model = GATRegressor(num_node_features, num_edge_features, hidden_dim, output_dim).to(self.device)
+        if self.model == 'GAT':
+            self.model = GATRegressor(num_node_features, hidden_dim, output_dim).to(self.device)
+        elif self.model == 'GATv2':
+            self.model = GATv2Regressor(num_node_features, hidden_dim, output_dim).to(self.device)
+        elif self.model == 'GATwithDropout':
+            self.model = GATRegressorDO(num_node_features, hidden_dim, output_dim).to(self.device)
+
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.LearningRate, weight_decay=0.75)
         print("Model initialized")
         print(self.model)
@@ -114,8 +184,6 @@ class TrainModelFromGraph:
         return total_loss / len(self.test_loader.dataset)
 
     def Training_loop(self):
-        self.load_data()
-        self.initialize_model()
         train_losses = []
         test_losses = []
         print("Start training...")
@@ -124,7 +192,7 @@ class TrainModelFromGraph:
             test_loss = self.test()
             train_losses.append(train_loss)
             test_losses.append(test_loss)
-            path = self.Out_path
+            path = self.out_path
             if not os.path.exists(path):
                 os.makedirs(path)
             if epoch == 0:
@@ -140,6 +208,7 @@ class TrainModelFromGraph:
                 plt.plot(test_losses, "k", label="Test loss")
                 plt.yscale('log')
                 plt.savefig(f"{path}/loss_plot.png")
+    
 
 
 class PlotRegresson:
@@ -202,6 +271,11 @@ def main():
     parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
     parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
+    parser.add_argument('--model', type=str, default='GAT', help='Model to use for training')
+    parser.add_argument('--plot_graph_features', action='store_true', help='Plot the graph features')
+    parser.add_argument('--normalize_features', action='store_true', help='Normalize the input features')
+    parser.add_argument('--normalize_targets', action='store_true ', help='Normalize the target values')
+    parser.add_argument('--normalize_edge_features', action='store_true', help='Normalize the edge features')
     parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate for training')
     parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
@@ -211,10 +285,13 @@ def main():
 
     args = parser.parse_args()
 
-
     # For training:
-    trainer = TrainModelFromGraph(Graph_path=args.graph_path, Out_path=args.out_path, BatchSize=args.batch_size, LearningRate=args.learning_rate, Epochs=args.epochs)
+    trainer = TrainModelFromGraph(**vars(args))
     if args.train:
+        trainer.load_data()
+        if args.plot_graph_features: 
+            trainer.plot_graph_features(trainer.train_loader)
+        trainer.initialize_model()
         trainer.Training_loop()
 
     # For evaluating:
