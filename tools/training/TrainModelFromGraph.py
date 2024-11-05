@@ -211,7 +211,7 @@ class TrainModelFromGraph:
     
 
 
-class PlotRegresson:
+'''class PlotRegresson:
     def __init__(self, model, test_loader, batch_size):
         self.model = model
         self.test_loader = test_loader
@@ -263,7 +263,7 @@ class PlotRegresson:
         plt.hist(self.phi_pred_arr, bins=50, color='g', alpha=0.5, label="prediction")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "phi_regression.png"))
-        plt.clf()
+        plt.clf()'''
 
 def main():
 
@@ -281,28 +281,27 @@ def main():
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--train', action='store_true', help='Train the model')
-    parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
-
     args = parser.parse_args()
 
     # For training:
     trainer = TrainModelFromGraph(**vars(args))
+    trainer.load_data()
+    if args.plot_graph_features: 
+        trainer.plot_graph_features(trainer.train_loader)
+    trainer.initialize_model()
+
     if args.train:
-        trainer.load_data()
-        if args.plot_graph_features: 
-            trainer.plot_graph_features(trainer.train_loader)
-        trainer.initialize_model()
         trainer.Training_loop()
 
     # For evaluating:
-    if args.evaluate:    
+'''    if args.evaluate:    
         trainer.load_data()
         test_loader = trainer.test_loader
         model = torch.load(args.model_path)
             
         evaluator = PlotRegresson(model, test_loader, batch_size=args.batch_size)
         evaluator.evaluate()
-        evaluator.plot_regression(output_dir=args.output_dir)
+        evaluator.plot_regression(output_dir=args.output_dir)'''
 
 if __name__ == "__main__":
     main()
