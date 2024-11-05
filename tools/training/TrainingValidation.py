@@ -1,3 +1,5 @@
+from TrainModelFromGraph import TrainModelFromGraph
+
 class PlotRegression:
     def __init__(self, model, test_loader, batch_size):
         self.model = model
@@ -41,3 +43,29 @@ class PlotRegression:
         plt.legend()
         plt.savefig(os.path.join(output_dir, "pt_regression_diff.png"))
         plt.clf()
+
+def main():
+
+    parser = argparse.ArgumentParser(description="Train and evaluate GAT model")
+    parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
+    parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
+    parser.add_argument('--model', type=str, default='GAT', help='Model to use for training')
+    parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
+    parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
+    parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
+    args = parser.parse_args()
+
+    trainer = TrainModelFromGraph(**vars(args))
+
+    # For evaluating:
+    trainer.load_data()
+    test_loader = trainer.test_loader
+    model = torch.load(args.model_path)
+            
+    evaluator = PlotRegresson(model, test_loader, batch_size=args.batch_size)
+    evaluator.evaluate()
+    evaluator.plot_regression(output_dir=args.output_dir)
+
+if __name__ == "__main__":
+    main()
