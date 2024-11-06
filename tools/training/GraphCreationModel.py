@@ -27,7 +27,7 @@ class GraphCreationModel():
         self.NUM_PHI_BINS = 5400
         self.HW_ETA_TO_ETA_FACTOR=0.010875
 
-        self.keep_branches = ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType','muonQPt','muonPropEta','muonPropPhi']
+        self.keep_branches = ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType','muonQPt','muonQOverPt','muonPropEta','muonPropPhi']
         self.muon_vars = ['muonQPt','muonPt','muonQOverPt','muonPropEta','muonPropPhi']
         self.stub_vars = ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType']
         self.dataset = None
