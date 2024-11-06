@@ -6,9 +6,11 @@ print('START\n')
 ########   customization  area #########
 InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/" # list with all the file directories
 queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_241015/"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_241106/"
 Connectivity = ["all","3"]
+MuonVars = ["muonQPt","muonQOverPt"]
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/GraphCreation/"
+GraphFileName = "vix_graph_6Nov"
 ########   customization end   #########
 
 path = os.getcwd()
@@ -51,9 +53,11 @@ for ifile in list_of_files:
         fout.write("source pyenv/bin/activate\n")
         for connection in Connectivity:
             fout.write("echo 'Running Connectivity: %s' \n" %(connection))
-            output_graph_name = "%s/vix_graph_%s_15Oct_onlypt_%03d.pkl" %(OutputDir, connection, i)
-            fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
-            fout.write("python tools/training/GraphCreationModel.py --data_path %s:simOmtfPhase2Digis/OMTFHitsTree --graph_save_paths %s --model_connectivity %s\n" %(InputFolder+ifile,output_graph_name,connection))  
+            for muvars in MuonVars:
+                fout.write("echo 'Running With MuonVar: %s' \n" %(muvars))
+                output_graph_name = "%s/%s_%s_15Oct_%s_%03d.pkl" %(GraphFileName, OutputDir, connection, muvars, i)
+                fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
+                fout.write("python tools/training/GraphCreationModel.py --data_path %s:simOmtfPhase2Digis/OMTFHitsTree --graph_save_paths %s --model_connectivity %s\n" %(InputFolder+ifile,output_graph_name,connection))  
         fout.write("echo 'STOP---------------'\n")
         fout.write("echo\n")
         fout.write("echo\n")

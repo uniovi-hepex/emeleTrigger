@@ -28,8 +28,8 @@ class GraphCreationModel():
         self.HW_ETA_TO_ETA_FACTOR=0.010875
 
         self.keep_branches = ['stubEtaG', 'stubPhi','stubR', 'stubLayer','stubType','muonQPt','muonPropEta','muonPropPhi']
-        self.muon_vars = ['muonQPt','muonPropEta','muonPropPhi']
-        self.stub_vars = ['stubEtaG', 'stubPhi','stubR', 'stubLayer','stubType']
+        self.muon_vars = ['muonQPt','muonPt','muonQOverPt','muonPropEta','muonPropPhi']
+        self.stub_vars = ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType']
         self.dataset = None
         self.pyg_graphs = None
         self.graphs = None
@@ -75,7 +75,8 @@ class GraphCreationModel():
         dataset['stubPhiB'] = dataset['stubPhi'] 
         dataset['muonPropEta'] = dataset.apply(lambda x: abs(x['muonPropEta']), axis=1)
         dataset['muonQPt'] = dataset['muonCharge']*dataset['muonPt']
-
+        dataset['muonQOverPt'] = dataset['muonCharge']/dataset['muonPt']
+        
         return dataset
 
     ##  calculate coordinate r for each stub
@@ -247,7 +248,7 @@ class GraphCreationModel():
                             target_node_index = row['stubLayer'].index(target_node_layer)
 
                             # Añadir arista usando etiquetas de stubLayer
-                            G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhi'][stubId],row['stubPhi'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]))
+                            G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhiG'][stubId],row['stubPhiG'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]))
                 else: ##  connected to k-neighbours
                     connected_layers = self.getListOfConnectedLayers(row['stubEtaG'][stubId])
                     source_node_layer_index = connected_layers.index(stubLayer_label)
@@ -260,9 +261,9 @@ class GraphCreationModel():
                         target_node_index = row['stubLayer'].index(target_node_layer)
                                             
                         # Añadir arista usando etiquetas de stubLayer
-                        G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhi'][stubId],row['stubPhi'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]))
-            if row["muonQPt"] != 0:
-                self.graphs.append(G)
+                        G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhiG'][stubId],row['stubPhiG'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]))
+            
+            self.graphs.append(G)
         print('Graphs created and stored')
 
     def getGraphWithNodes(self,nodes):

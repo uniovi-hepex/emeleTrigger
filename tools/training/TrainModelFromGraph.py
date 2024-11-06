@@ -238,7 +238,7 @@ class TrainModelFromGraph:
         ok = relative_diff < (threshold)
         
         # Calcular la precisión
-        accuracy = ok.float().mean().item()
+        accuracy = ok.sum().item()
         
         return accuracy
 
