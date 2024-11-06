@@ -55,7 +55,7 @@ for ifile in list_of_files:
             fout.write("echo 'Running Connectivity: %s' \n" %(connection))
             for muvars in MuonVars:
                 fout.write("echo 'Running With MuonVar: %s' \n" %(muvars))
-                output_graph_name = "%s/%s_%s_15Oct_%s_%03d.pkl" %(GraphFileName, OutputDir, connection, muvars, i)
+                output_graph_name = "%s/%s_%s_15Oct_%s_%03d.pkl" %(OutputDir, GraphFileName, connection, muvars, i)
                 fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
                 fout.write("python tools/training/GraphCreationModel.py --data_path %s:simOmtfPhase2Digis/OMTFHitsTree --muon_vars %s --graph_save_paths %s --model_connectivity %s\n" %(InputFolder+ifile,output_graph_name,muvars, connection))  
         fout.write("echo 'STOP---------------'\n")
