@@ -29,17 +29,6 @@ class GATRegressor(torch.nn.Module):
         x = self.fc1(x)
         return x
     
-    def fit(self,data, epochs): 
-        criterion = torch.nn.MSELoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=0.01)
-        self.train()
-        for epoch in range(epochs):
-            self.optimizer.zero_grad()
-            out = self.forward(data)
-            loss = self.loss_fn(out, data.y.view(out.size()))
-            loss.backward()
-            self.optimizer.step()
-            print(f"Epoch {epoch}: Loss {loss.item()}")
 
 class GATv2Regressor(torch.nn.Module):
     def __init__(self, num_node_features, hidden_dim, output_dim=1):

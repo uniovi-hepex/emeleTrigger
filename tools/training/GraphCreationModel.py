@@ -254,7 +254,7 @@ class GraphCreationModel():
                     source_node_layer_index = connected_layers.index(stubLayer_label)
                     for idx, target_node_layer in enumerate(connected_layers):
                         if target_node_layer == stubLayer_label: continue
-                        if target_node_layer not in row['stubLayer']: continue
+                        if target_node_layer not in row['stubLayer']: continue 
                         if abs(source_node_layer_index - idx) > self.connectivity: continue
 
                         # Asegurarse de que el target_node_layer ya existe como nodo en el grafo

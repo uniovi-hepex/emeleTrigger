@@ -1,4 +1,4 @@
-import torch
+import torch, torch_geometric
 from torch_geometric.loader import DataLoader
 import os
 
@@ -9,6 +9,9 @@ from models import GATRegressor,GATv2Regressor
 from torch_geometric.transforms import BaseTransform
 
 import itertools
+
+#import torch._dynamo
+#torch._dynamo.config.capture_scalar_outputs = True
 
 class NormalizeNodeFeatures(BaseTransform):
     def __call__(self, data):
@@ -66,7 +69,7 @@ class TrainModelFromGraph:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = None
         self.optimizer = None
-        self.loss_fn = torch.nn.MSELoss()
+        self.loss_fn = torch.nn.MSELoss().to(device)
     
         # Apply transformations if necessary
         self.transforms = []
@@ -195,7 +198,8 @@ class TrainModelFromGraph:
             self.model = GATv2Regressor(num_node_features, hidden_dim, output_dim).to(self.device)
         elif self.model_type == 'GATwithDropout':
             self.model = GATRegressorDO(num_node_features, hidden_dim, output_dim).to(self.device)
-
+        
+        #self.model = torch_geometric.compile(self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.75)
         print("Model initialized")
         print(self.model)
@@ -213,7 +217,7 @@ class TrainModelFromGraph:
             loss.backward()
             self.optimizer.step()
             total_loss += float(loss)
-            total_accuracy += self.accuracy(out, data.y)
+            total_accuracy += 0 #self.accuracy(out, data.y)
         return total_loss / len(self.train_loader.dataset), total_accuracy / len(self.train_loader.dataset)
 
     def test(self):
@@ -227,7 +231,7 @@ class TrainModelFromGraph:
                 # loss = self.loss_fn(out, data.y.reshape(self.batch_size,3))
                 loss = self.loss_fn(out, data.y.view(out.size()))
                 total_loss += float(loss)
-                total_accuracy += self.accuracy(out, data.y)
+                total_accuracy += 0 #self.accuracy(out, data.y)
         return total_loss / len(self.test_loader.dataset), total_accuracy / len(self.test_loader.dataset)
 
     def accuracy(self, predictions, targets, threshold=0.10):
