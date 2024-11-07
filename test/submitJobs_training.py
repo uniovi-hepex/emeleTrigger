@@ -28,12 +28,10 @@ else :
 ## print info
 print("InputFolder: %s" %(InputFolder))
 print("OutputDir: %s" %(OutputDir))
-print("Connectivity: %s" %(Connectivity))
-print("Number of files: %d" %(len(list_of_files)))
 
 ##### creating job #####
 
-with open('%s/exec/job_train_model.sh', 'w') as fout:
+with open('%s/exec/job_train_model.sh' %(WORKDIR), 'w') as fout:
     fout.write("#!/bin/sh\n")
     fout.write("echo\n")
     fout.write("echo\n")
@@ -41,12 +39,12 @@ with open('%s/exec/job_train_model.sh', 'w') as fout:
     fout.write("echo 'WORKDIR ' ${PWD}\n")
     fout.write("cd "+str(path)+"\n")
     fout.write("source pyenv/bin/activate\n")
-    fout.write("echo 'Saving Model in  %s' \n" %(output_graph_name))
+    fout.write("echo 'Saving Model in  %s' \n" %(OutputDir))
     fout.write("python tools/training/TrainModelFromGraph.py --graph_path %s --out_path %s --do_train \n" %(InputFolder, OutputDir))  
     fout.write("echo 'STOP---------------'\n")
     fout.write("echo\n")
     fout.write("echo\n")
-os.system("chmod 755 %s/exec/job_train_model.sh")
+os.system("chmod 755 %s/exec/job_train_model.sh" %(WORKDIR))
 
 ###### create submit.sub file ####
 with open('submit.sub', 'w') as fout:
@@ -55,6 +53,7 @@ with open('submit.sub', 'w') as fout:
     fout.write("output                  = %s/batchlogs/$(ClusterId).$(ProcId).out\n" %(WORKDIR))
     fout.write("error                   = %s/batchlogs/$(ClusterId).$(ProcId).err\n"    %(WORKDIR))
     fout.write("log                     = %s/batchlogs/$(ClusterId).log\n"             %(WORKDIR))
+    fout.write("request_gpus            = 1\n")
     fout.write('+JobFlavour = "%s"\n' %(queue))
     fout.write("\n")
     fout.write("queue filename matching (%s/exec/job_*sh)\n" %(WORKDIR))

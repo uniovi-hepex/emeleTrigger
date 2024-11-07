@@ -225,7 +225,9 @@ class GraphCreationModel():
             return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer])
 
     def getDeltaPhi(self,phi1,phi2):
-        return phi1 - phi2
+        dphi = phi1 - phi2
+        dphi = (dphi + torch.pi) % (2 * torch.pi) - torch.pi
+        return dphi
 
     def getDeltaEta(self,eta1,eta2):
         return eta1-eta2

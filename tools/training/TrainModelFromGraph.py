@@ -69,7 +69,7 @@ class TrainModelFromGraph:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = None
         self.optimizer = None
-        self.loss_fn = torch.nn.MSELoss().to(device)
+        self.loss_fn = torch.nn.MSELoss().to(self.device)
     
         # Apply transformations if necessary
         self.transforms = []
