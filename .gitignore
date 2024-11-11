@@ -16,3 +16,6 @@ pyenv_win
 *.pt
 *.pth
 
+tools/training_v2/*.csv
+tools/training_v2/logs
+tools/training_v2/data

@@ -1,0 +1,50 @@
+# OMTFGnnConfig.yaml
+
+# Data Download Settings
+data_download:
+  download_data: False  # Set to false to skip downloading raw files
+  data_base_url: "https://cernbox.cern.ch/s/yLjF3gZjbI9YAlz/"  # Ensure it ends with a slash
+  file_prefix: "data_"
+  file_suffix: ".root"
+  start_index: 1
+  end_index: 2
+  raw_data_dir: "data/raw/"
+  tree_name: "simOmtfPhase2Digis/OMTFHitsTree"  
+
+# Data Processing Settings
+data_processing:
+  graph_save_path: "data/processed/graphs.pt"
+  model_connectivity: "all"  # or specify k-neighbors like "5"
+  muon_vars:
+    - muonQPt
+    - muonPt
+  stub_vars:
+    - stubEtaG
+    - stubPhiG
+  n_splits: 5  # Number of folds for cross-validation
+
+# Training and Optimization Settings
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 1e-5
+  n_trials: 50
+  seed: 42
+
+# Logging and Monitoring Settings
+logging:
+  use_wandb: true
+  wandb_project: "gnn-optimization-project"
+  wandb_api_key: "your_wandb_api_key_here"  # Optional if already logged in
+  checkpoints_dir: "checkpoints/"
+  logs_dir: "logs/"
+  enable_profiling: false  # Set to true to enable PyTorch Profiler
+  profiler_output_dir: "logs/profiler/"
+  enable_validation: true  # Set to true to enable graph validation
+  debug: true            # Set to true to enable debug mode (load subset of data)
+
+# Resource Settings
+resources:
+  num_workers: 4
+  device: "cuda"  # or "cpu"
