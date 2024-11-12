@@ -1,17 +1,19 @@
+import torch
+
 from TrainModelFromGraph import TrainModelFromGraph
+import matplotlib.pyplot as plt
 
 class PlotRegression:
-    def __init__(self, model, test_loader, batch_size):
-        self.model = model
+    def __init__(self, model, test_loader):
+        self.trained_model = model
         self.test_loader = test_loader
-        self.batch_size = batch_size
         self.pt_pred_arr = []
         self.pt_truth_arr = []
 
     def evaluate(self):
         with torch.no_grad():
             for data in self.test_loader:
-                out = self.model(data)
+                out = self.trained_model(data)
                 for item in range(0, out.size(0)):
                     vector_pred = out[item]
                     vector_real = data[item].y
@@ -46,24 +48,32 @@ class PlotRegression:
 
 def main():
 
+    import argparse
+
     parser = argparse.ArgumentParser(description="Train and evaluate GAT model")
-    parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
-    parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
-    parser.add_argument('--model', type=str, default='GAT', help='Model to use for training')
-    parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
+    parser = TrainModelFromGraph.add_args(parser)
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     args = parser.parse_args()
 
     trainer = TrainModelFromGraph(**vars(args))
 
-    # For evaluating:
     trainer.load_data()
     test_loader = trainer.test_loader
-    model = torch.load(args.model_path)
+
+    # Inicializar el modelo
+    trainer.initialize_model()
+
+    # Cargar el modelo con map_location
+    if torch.cuda.is_available():
+        state_dict = torch.load(args.model_path)
+    else:
+        state_dict = torch.load(args.model_path, map_location=torch.device('cpu'))
+
+    # Reasignar los parámetros al modelo actual
+    trainer.model.load_state_dict(state_dict)
             
-    evaluator = PlotRegresson(model, test_loader, batch_size=args.batch_size)
+    evaluator = PlotRegression(trainer.model, test_loader)
     evaluator.evaluate()
     evaluator.plot_regression(output_dir=args.output_dir)
 

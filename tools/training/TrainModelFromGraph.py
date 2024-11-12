@@ -1,12 +1,13 @@
-import torch, torch_geometric
+import torch
 from torch_geometric.loader import DataLoader
+from torch_geometric.transforms import BaseTransform
+
 import os
 
 import argparse
 import matplotlib.pyplot as plt
 from models import GATRegressor,GATv2Regressor
 
-from torch_geometric.transforms import BaseTransform
 
 import itertools
 
@@ -47,6 +48,24 @@ class NormalizeSpecificNodeFeatures(BaseTransform):
 
 
 class TrainModelFromGraph:
+    @staticmethod
+    def add_args(parser):
+        parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
+        parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
+        parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
+        parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate for training')
+        parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
+        parser.add_argument('--model_path', type=str, default=None, help='Path to the saved model for evaluation')
+        parser.add_argument('--output_dir', type=str, default=None, help='Output directory for evaluation results')
+        parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
+        parser.add_argument('--model_type', type=str, default='GAT', help='Model to use for training')
+        parser.add_argument('--normalize_features', action='store_true', help='Normalize node features')
+        parser.add_argument('--normalize_targets', action='store_true', help='Normalize target features')
+        parser.add_argument('--normalize_edge_features', action='store_true', help='Normalize edge features')
+        parser.add_argument('--normalize_specific_features', type=int, nargs='+', default=None, help='Normalize specific node feature columns')
+        parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
+        return parser
+
     def __init__(self, **kwargs):
         self.graph_path = kwargs.get('graph_path', 'graph_folder')
         self.out_path = kwargs.get('out_path', 'Bsize_gmp_64_lr5e-4_v3')
@@ -81,6 +100,11 @@ class TrainModelFromGraph:
             self.transforms.append(NormalizeTargets())
         if self.normalize_specific_features is not None:
             self.transforms.append(NormalizeSpecificNodeFeatures(self.normalize_specific_features))
+
+        # For evaluation:
+        self.trained_model = None
+        self.pt_pred_arr = []
+        self.pt_truth_arr = []
 
     def load_data(self):
         # Loading data from graph and convert it to DataLoader
@@ -280,6 +304,46 @@ class TrainModelFromGraph:
                 plt.savefig(f"{path}/loss_accuracy_plot.png")
                 plt.close()
     
+    def load_trained_model(self):
+        print(f"Loading model from {self.model_path}")
+        self.trained_model = torch.load(self.model_path, map_location=torch.device('cpu'))
+
+    def evaluate(self):
+        with torch.no_grad():
+            for data in self.test_loader:
+                out = self.trained_model(data)
+                for item in range(0, out.size(0)):
+                    vector_pred = out[item]
+                    vector_real = data[item].y
+                    self.pt_pred_arr.append(vector_pred.item())
+                    self.pt_truth_arr.append(vector_real.item())
+    
+    def plot_regression(self, output_dir):
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        plt.clf()
+        print(f"Plotting regression in {output_dir}")
+        plt.hist(self.pt_truth_arr, bins=100, color='skyblue', alpha=0.5, label="truth")
+        plt.hist(self.pt_pred_arr, bins=100, color='g', alpha=0.5, label="prediction")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "pt_regression.png"))
+        plt.clf()
+
+        print(f"Plotting scatter in {output_dir}")
+        plt.plot(self.pt_truth_arr, self.pt_pred_arr, 'o')
+        plt.xlabel("Truth")
+        plt.ylabel("Prediction")
+        plt.savefig(os.path.join(output_dir, "pt_regression_scatter.png"))
+        plt.clf()
+
+        print(f"Plotting difference in {output_dir}")
+        # plot difference between truth and prediction
+        diff = [x - y for x, y in zip(self.pt_truth_arr, self.pt_pred_arr)]
+        plt.hist(diff, bins=100, color='r', alpha=0.5, label="difference")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "pt_regression_diff.png"))
+        plt.clf()
+
 def main():
 
     parser = argparse.ArgumentParser(description="Train and evaluate GAT model")
@@ -298,6 +362,7 @@ def main():
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--do_train', action='store_true', help='Train the model')
+    parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
 
     args = parser.parse_args()
 
@@ -306,10 +371,16 @@ def main():
     trainer.load_data()
     if args.plot_graph_features: 
         trainer.plot_graph_features(trainer.train_loader)
-    trainer.initialize_model()
 
     if args.do_train:
+        trainer.initialize_model()
         trainer.Training_loop()
+
+    if args.evaluate:
+        trainer.load_trained_model()
+        trainer.evaluate()
+        trainer.plot_regression(output_dir=args.output_dir)
+
 
 if __name__ == "__main__":
     main()
