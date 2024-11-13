@@ -11,8 +11,8 @@ class GATRegressor(torch.nn.Module):
         self.conv2 = GATConv(hidden_dim, hidden_dim)
         self.fc1 = torch.nn.Linear(hidden_dim*2, output_dim)
 
-    def forward(self, data):
-        x, edge_index, batch = data.x.float(), data.edge_index, data.batch
+    def forward(self, x, edge_index, edge_attr, batch):
+        #x, edge_index, batch = data.x.float(), data.edge_index, data.batch
         '''        # Verificar la presencia de deltaPhi y deltaEta
                 if hasattr(data, 'deltaPhi') and hasattr(data, 'deltaEta'):
                     deltaPhi, deltaEta = data.deltaPhi.float(), data.deltaEta.float()
@@ -21,11 +21,11 @@ class GATRegressor(torch.nn.Module):
                     edge_attr = None
         '''
         x = F.relu(x)
-        x = self.conv1(x, edge_index, edge_attr=data.edge_attr)
+        x = self.conv1(x, edge_index, edge_attr=edge_attr)
         x = F.relu(x)
-        x = self.conv2(x, edge_index, edge_attr=data.edge_attr)
+        x = self.conv2(x, edge_index, edge_attr=edge_attr)
         x = F.relu(x)
-        x = torch.cat([global_max_pool(x, batch), global_mean_pool(x, batch)], dim=1)
+        x = global_mean_pool(x, batch) #torch.cat([global_max_pool(x, batch), global_mean_pool(x, batch)], dim=1)
         x = self.fc1(x)
         return x
     

@@ -81,15 +81,17 @@ class TrainModelFromGraph:
         self.normalize_edge_features = kwargs.get('normalize_edge_features', False)
         self.normalize_specific_features = kwargs.get('normalize_specific_features', None)
         self.num_files = kwargs.get('num_files', None)  # Número de archivos a cargar
+        self.device = kwargs.get('device', 'cpu')
+        
 
         # Initialize other attributes
         self.train_loader = None
         self.test_loader = None
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = None
         self.optimizer = None
         self.loss_fn = torch.nn.MSELoss().to(self.device)
-    
+        self.device = torch.device('cuda' if (torch.cuda.is_available() and self.device == 'cuda') else 'cpu')
+
         # Apply transformations if necessary
         self.transforms = []
         if self.normalize_features:
@@ -136,7 +138,7 @@ class TrainModelFromGraph:
         # remove extra dimension in y and put deltaPhi and deltaEta in the data object as edge_attr
         for i in range(0, len(Graphs_for_training_filtered)):
             Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
-            Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)
+            Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1).float()
 
         # Apply transformations to the load data... 
         if self.transforms:
@@ -224,39 +226,33 @@ class TrainModelFromGraph:
             self.model = GATRegressorDO(num_node_features, hidden_dim, output_dim).to(self.device)
         
         #self.model = torch_geometric.compile(self.model)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.75)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.75).to(self.device)
         print("Model initialized")
         print(self.model)
 
     def train(self):
         self.model.train()
-        total_loss = 0
-        total_accuracy = 0
-        for data in self.train_loader:
+        for data in self.train_loader:       
             data = data.to(self.device)  # Mueve los datos al dispositivo
-            self.optimizer.zero_grad()
-            out = self.model(data)
-            # loss = self.loss_fn(out, data.y.reshape(self.batch_size,3))
+            out = self.model(data.x,data.edge_index,data.edge_attr,data.batch)  # Se llama al modelo con los datos
             loss = self.loss_fn(out, data.y.view(out.size()))
             loss.backward()
             self.optimizer.step()
-            total_loss += float(loss)
-            total_accuracy += 0 #self.accuracy(out, data.y)
-        return total_loss / len(self.train_loader.dataset), total_accuracy / len(self.train_loader.dataset)
+            self.optimizer.zero_grad()
 
-    def test(self):
-        with torch.no_grad():
-            self.model.eval()
-            total_loss = 0
-            total_accuracy = 0
-            for data in self.test_loader:
-                data = data.to(self.device)
-                out = self.model(data)
-                # loss = self.loss_fn(out, data.y.reshape(self.batch_size,3))
-                loss = self.loss_fn(out, data.y.view(out.size()))
-                total_loss += float(loss)
-                total_accuracy += 0 #self.accuracy(out, data.y)
-        return total_loss / len(self.test_loader.dataset), total_accuracy / len(self.test_loader.dataset)
+    @torch.no_grad()
+    def test(self, loader):
+        self.model.eval()
+        
+        total_loss = 0
+        total_accuracy = 0
+        for data in loader:
+            data = data.to(self.device)
+            out = self.model(data.x, data.edge_index, data.edge_attr, data.batch)
+            loss = self.loss_fn(out, data.y.view(out.size()))
+            total_loss += float(loss)
+            total_accuracy += self.accuracy(out, data.y)
+        return total_loss / len(loader.dataset), total_accuracy / len(loader.dataset)
 
     def accuracy(self, predictions, targets, threshold=0.10):
         # Calcular la diferencia relativa
@@ -266,9 +262,9 @@ class TrainModelFromGraph:
         ok = relative_diff < (threshold)
         
         # Calcular la precisión
-        accuracy = ok.sum().item()
+        acc = ok.sum()
         
-        return accuracy
+        return int(acc)
 
     def Training_loop(self):
         train_losses = []
@@ -276,17 +272,20 @@ class TrainModelFromGraph:
         train_accuracies = []
         test_accuracies = []
 
+        print(f"Saving results in {self.out_path}")
+        path = self.out_path
+        if not os.path.exists(path):
+            os.makedirs(path)
+        
         print("Start training...")
         for epoch in range(self.epochs):
-            train_loss, train_accuracy = self.train()
-            test_loss, test_accuracy = self.test()
+            self.train()
+            train_loss, train_accuracy = self.test(self.train_loader)
+            test_loss, test_accuracy = self.test(self.test_loader)
             train_losses.append(train_loss)
             test_losses.append(test_loss)
             train_accuracies.append(train_accuracy)
             test_accuracies.append(test_accuracy)
-            path = self.out_path
-            if not os.path.exists(path):
-                os.makedirs(path)
             if epoch == 0:
                 torch.save(test_loss, f"{path}/testloss_{epoch + 1}.pt")
                 torch.save(train_loss, f"{path}/trainloss_{epoch + 1}.pt")
@@ -363,6 +362,7 @@ def main():
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--do_train', action='store_true', help='Train the model')
     parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
+    parser.add_argument('--device', type=str, default='cpu', help='Device to use for training')
 
     args = parser.parse_args()
 
