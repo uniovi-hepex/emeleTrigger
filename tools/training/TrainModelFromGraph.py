@@ -138,7 +138,7 @@ class TrainModelFromGraph:
         # remove extra dimension in y and put deltaPhi and deltaEta in the data object as edge_attr
         for i in range(0, len(Graphs_for_training_filtered)):
             Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
-            Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1).float()
+            Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)
 
         # Apply transformations to the load data... 
         if self.transforms:

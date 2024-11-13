@@ -232,6 +232,16 @@ class GraphCreationModel():
     def getDeltaEta(self,eta1,eta2):
         return eta1-eta2
     
+    ### TODO:  generate graphs from dataset, without using networkx...
+    def generate_graphs_from_dataset(self):
+        self.graphs = []
+        for index, row in self.dataset.iterrows():
+            for stubId,stubLayer_label in enumerate(row['stubLayer']):
+                x = [row[k][stubId] for k in self.stub_vars]
+                y = [row[k] for k in self.muon_vars]
+                edge_index = []
+
+
     def convert_to_graph(self):
 
         self.graphs = []
