@@ -226,7 +226,7 @@ class TrainModelFromGraph:
             self.model = GATRegressorDO(num_node_features, hidden_dim, output_dim).to(self.device)
         
         #self.model = torch_geometric.compile(self.model)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.75).to(self.device)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.75)
         print("Model initialized")
         print(self.model)
 
