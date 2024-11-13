@@ -8,6 +8,7 @@ import argparse
 import matplotlib.pyplot as plt
 from models import GATRegressor,GATv2Regressor
 
+import time
 
 import itertools
 
@@ -234,7 +235,7 @@ class TrainModelFromGraph:
         self.model.train()
         for data in self.train_loader:       
             data = data.to(self.device)  # Mueve los datos al dispositivo
-            out = self.model(data.x,data.edge_index,data.edge_attr,data.batch)  # Se llama al modelo con los datos
+            out = self.model(data)  # Se llama al modelo con los datos
             loss = self.loss_fn(out, data.y.view(out.size()))
             loss.backward()
             self.optimizer.step()
@@ -248,7 +249,7 @@ class TrainModelFromGraph:
         total_accuracy = 0
         for data in loader:
             data = data.to(self.device)
-            out = self.model(data.x, data.edge_index, data.edge_attr, data.batch)
+            out = self.model(data)
             loss = self.loss_fn(out, data.y.view(out.size()))
             total_loss += float(loss)
             total_accuracy += self.accuracy(out, data.y)
@@ -279,6 +280,8 @@ class TrainModelFromGraph:
         
         print("Start training...")
         for epoch in range(self.epochs):
+            start = time.time()
+
             self.train()
             train_loss, train_accuracy = self.test(self.train_loader)
             test_loss, test_accuracy = self.test(self.test_loader)
@@ -290,6 +293,7 @@ class TrainModelFromGraph:
                 torch.save(test_loss, f"{path}/testloss_{epoch + 1}.pt")
                 torch.save(train_loss, f"{path}/trainloss_{epoch + 1}.pt")
             elif (epoch + 1) % 10 == 0:
+                print(f'Time per epoch: {time.time() - start:.2f}s')
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}, Train accuracy: {train_accuracy:.4f}, Test accuracy: {test_accuracy:.4f}')
                 torch.save(self.model, f"{path}/model_{epoch + 1}.pth")
                 torch.save(test_loss, f"{path}/testloss_{epoch + 1}.pt")
