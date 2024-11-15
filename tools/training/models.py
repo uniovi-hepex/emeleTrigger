@@ -25,7 +25,7 @@ class GATRegressor(torch.nn.Module):
         x = F.relu(x)
         x = self.conv2(x, edge_index, edge_attr=edge_attrib)
         x = F.relu(x)
-        x = global_mean_pool(x, batch) #torch.cat([global_max_pool(x, batch), global_mean_pool(x, batch)], dim=1)
+        x = torch.cat([global_max_pool(x, batch), global_mean_pool(x, batch)], dim=1)
         x = self.fc1(x)
         return x
     

@@ -1,19 +1,21 @@
 import torch
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import BaseTransform
+from torch_geometric.data import Data
 
 import os
 
 import argparse
 import matplotlib.pyplot as plt
 from models import GATRegressor,GATv2Regressor
-
-import time
+import pickle
 
 import itertools
 
 #import torch._dynamo
 #torch._dynamo.config.capture_scalar_outputs = True
+
+#torch.serialization.add_safe_globals([Data])
 
 class NormalizeNodeFeatures(BaseTransform):
     def __call__(self, data):
@@ -52,13 +54,14 @@ class TrainModelFromGraph:
     @staticmethod
     def add_args(parser):
         parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
+        parser.add_argument('--graph_name', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Name of the graph data')
         parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
         parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
         parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate for training')
         parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
         parser.add_argument('--model_path', type=str, default=None, help='Path to the saved model for evaluation')
         parser.add_argument('--output_dir', type=str, default=None, help='Output directory for evaluation results')
-        parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
+        parser.add_argument('--do_validation', action='store_true', help='Evaluate the model')
         parser.add_argument('--model_type', type=str, default='GAT', help='Model to use for training')
         parser.add_argument('--normalize_features', action='store_true', help='Normalize node features')
         parser.add_argument('--normalize_targets', action='store_true', help='Normalize target features')
@@ -69,20 +72,21 @@ class TrainModelFromGraph:
 
     def __init__(self, **kwargs):
         self.graph_path = kwargs.get('graph_path', 'graph_folder')
+        self.graph_name = kwargs.get('graph_name', 'vix_graph_13Nov_3_muonQOverPt')
         self.out_path = kwargs.get('out_path', 'Bsize_gmp_64_lr5e-4_v3')
         self.batch_size = kwargs.get('batch_size', 64)
         self.learning_rate = kwargs.get('learning_rate', 0.0005)
         self.epochs = kwargs.get('epochs', 100)
         self.model_path = kwargs.get('model_path', None)
         self.output_dir = kwargs.get('output_dir', None)
-        self.evaluate = kwargs.get('evaluate', False)
+        self.do_validation = kwargs.get('evaluate', False)
         self.model_type = kwargs.get('model_type', 'GAT')
         self.normalize_features = kwargs.get('normalize_features', False)
         self.normalize_targets = kwargs.get('normalize_targets', False)
         self.normalize_edge_features = kwargs.get('normalize_edge_features', False)
         self.normalize_specific_features = kwargs.get('normalize_specific_features', None)
         self.num_files = kwargs.get('num_files', None)  # Número de archivos a cargar
-        self.device = kwargs.get('device', 'cpu')
+        self.device = kwargs.get('device', 'cuda')
         
 
         # Initialize other attributes
@@ -115,20 +119,23 @@ class TrainModelFromGraph:
         all_files = os.listdir(self.graph_path)
 
         # Filter for .pkl files
-        pkl_files = [f for f in all_files if f.endswith('.pkl')]
-        if not pkl_files:
+        graph_files = [f for f in all_files if self.graph_name in f]
+        if not graph_files:
             print("No .pkl files found in the directory.")
             return []
         
         if self.num_files is not None:
             print(f"Loading {self.num_files} files")
-            pkl_files = pkl_files[:self.num_files]
+            graph_files = graph_files[:self.num_files]
 
-        for pkl_file in pkl_files:
-            file_path = os.path.join(self.graph_path, pkl_file)
-            with open(file_path, 'rb') as file:
-                graphfile = torch.load(file)
-                graphs.append(graphfile)
+        for graph_file in graph_files:
+            file_path = os.path.join(self.graph_path, graph_file)
+            if graph_file.endswith('.pt'):
+                graph = torch.load(file_path)
+            elif graph_file.endswith('.pkl'):
+                with open(file_path, 'rb') as file:
+                    graph = torch.load(file)
+            graphs.append(graph)
 
         Graphs_for_training = list(itertools.chain.from_iterable(graphs))
         print(f"Total Graphs: {len(Graphs_for_training)}")
@@ -235,7 +242,7 @@ class TrainModelFromGraph:
         self.model.train()
         for data in self.train_loader:       
             data = data.to(self.device)  # Mueve los datos al dispositivo
-            out = self.model(data)  # Se llama al modelo con los datos
+            out = self.model(data)
             loss = self.loss_fn(out, data.y.view(out.size()))
             loss.backward()
             self.optimizer.step()
@@ -280,8 +287,6 @@ class TrainModelFromGraph:
         
         print("Start training...")
         for epoch in range(self.epochs):
-            start = time.time()
-
             self.train()
             train_loss, train_accuracy = self.test(self.train_loader)
             test_loss, test_accuracy = self.test(self.test_loader)
@@ -293,7 +298,6 @@ class TrainModelFromGraph:
                 torch.save(test_loss, f"{path}/testloss_{epoch + 1}.pt")
                 torch.save(train_loss, f"{path}/trainloss_{epoch + 1}.pt")
             elif (epoch + 1) % 10 == 0:
-                print(f'Time per epoch: {time.time() - start:.2f}s')
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}, Train accuracy: {train_accuracy:.4f}, Test accuracy: {test_accuracy:.4f}')
                 torch.save(self.model, f"{path}/model_{epoch + 1}.pth")
                 torch.save(test_loss, f"{path}/testloss_{epoch + 1}.pt")
@@ -306,20 +310,23 @@ class TrainModelFromGraph:
                 plt.yscale('log')
                 plt.savefig(f"{path}/loss_accuracy_plot.png")
                 plt.close()
-    
+
+    def set_model_path(self, path):
+        self.model_path = path
+        
     def load_trained_model(self):
         print(f"Loading model from {self.model_path}")
         self.trained_model = torch.load(self.model_path, map_location=torch.device('cpu'))
 
+    @torch.no_grad()
     def evaluate(self):
-        with torch.no_grad():
-            for data in self.test_loader:
-                out = self.trained_model(data)
-                for item in range(0, out.size(0)):
-                    vector_pred = out[item]
-                    vector_real = data[item].y
-                    self.pt_pred_arr.append(vector_pred.item())
-                    self.pt_truth_arr.append(vector_real.item())
+        for data in self.test_loader:
+            out = self.trained_model(data)
+            for item in range(0, out.size(0)):
+                vector_pred = out[item]
+                vector_real = data[item].y
+                self.pt_pred_arr.append(vector_pred.item())
+                self.pt_truth_arr.append(vector_real.item())
     
     def plot_regression(self, output_dir):
         if not os.path.exists(output_dir):
@@ -351,6 +358,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Train and evaluate GAT model")
     parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
+    parser.add_argument('--graph_name', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Name of the graph data')
     parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
     parser.add_argument('--model_type', type=str, default='GAT', help='Model to use for training')
@@ -365,8 +373,8 @@ def main():
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--do_train', action='store_true', help='Train the model')
-    parser.add_argument('--evaluate', action='store_true', help='Evaluate the model')
-    parser.add_argument('--device', type=str, default='cpu', help='Device to use for training')
+    parser.add_argument('--do_validation', action='store_true', help='Evaluate the model')
+    parser.add_argument('--device', type=str, default='cuda', help='Device to use for training')
 
     args = parser.parse_args()
 
@@ -380,7 +388,7 @@ def main():
         trainer.initialize_model()
         trainer.Training_loop()
 
-    if args.evaluate:
+    if args.do_validation:
         trainer.load_trained_model()
         trainer.evaluate()
         trainer.plot_regression(output_dir=args.output_dir)
