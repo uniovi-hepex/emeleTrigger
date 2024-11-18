@@ -3,7 +3,7 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.data import Data
 
-import os
+import os,sys
 
 import argparse
 import matplotlib.pyplot as plt
@@ -94,7 +94,9 @@ class TrainModelFromGraph:
         self.test_loader = None
         self.model = None
         self.optimizer = None
-        self.loss_fn = torch.nn.MSELoss().to(self.device)
+        self.loss_fn = torch.nn.MSELoss(reduction='sum').to(self.device)
+#        self.loss_fn = torch.nn.CrossEntropyLoss().to(self.device)
+
         self.device = torch.device('cuda' if (torch.cuda.is_available() and self.device == 'cuda') else 'cpu')
 
         # Apply transformations if necessary
@@ -147,6 +149,12 @@ class TrainModelFromGraph:
         for i in range(0, len(Graphs_for_training_filtered)):
             Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
             Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)
+
+        Graphs_for_training_filtered = [
+            g for g in Graphs_for_training_filtered
+            if not torch.isnan(g.y).any()
+        ]
+        print(f"Filtered Graphs: {len(Graphs_for_training_filtered)}")
 
         # Apply transformations to the load data... 
         if self.transforms:
@@ -242,11 +250,36 @@ class TrainModelFromGraph:
         self.model.train()
         for data in self.train_loader:       
             data = data.to(self.device)  # Mueve los datos al dispositivo
+
+            # Verificar si hay valores extremadamente grandes o pequeños en los datos de entrada
+            if torch.max(data.x) > 1e6 or torch.min(data.x) < -1e6:
+                print("Warning: Extremely large or small values found in input node features")
+                continue
+            if torch.max(data.edge_attr) > 1e6 or torch.min(data.edge_attr) < -1e6:
+                print("Warning: Extremely large or small values found in edge attributes")
+                continue
+            if torch.max(data.y) > 1e6 or torch.min(data.y) < -1e6:
+                print("Warning: Extremely large or small values found in target values")
+                continue
+
+
+            self.optimizer.zero_grad()
             out = self.model(data)
+
+            # Verificar si hay valores nan o inf en las salidas del modelo
+            if torch.isnan(out).any() or torch.isinf(out).any():
+                print("Warning: NaN or Inf values found in model output")
+                continue
+
             loss = self.loss_fn(out, data.y.view(out.size()))
+
+            # Verificar si hay valores nan o inf en la pérdida
+            if torch.isnan(loss) or torch.isinf(loss):
+                print("Warning: NaN or Inf values found in loss")
+                sys.exit(1)
+
             loss.backward()
             self.optimizer.step()
-            self.optimizer.zero_grad()
 
     @torch.no_grad()
     def test(self, loader):
@@ -368,7 +401,7 @@ def main():
     parser.add_argument('--normalize_edge_features', action='store_true', help='Normalize edge features')
     parser.add_argument('--normalize_specific_features', type=int, nargs='+', default=None, help='Normalize specific node feature columns')
     parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
-    parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=0.005, help='Learning rate for training')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for training')
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
