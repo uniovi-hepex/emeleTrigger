@@ -114,3 +114,73 @@ class PlotRegression:
         plt.legend()
         plt.savefig(os.path.join(output_dir, "pt_regression.png"))
         plt.clf()
+
+
+## THIS IS THE BEST MODEL UP-TO-DATE (28/11/24):
+import torch
+import torch.nn.functional as F
+from torch_geometric.nn import MessagePassing, global_max_pool, global_mean_pool, AttentionalAggregation
+from torch_geometric.utils import add_self_loops, degree, softmax
+
+class MPL(MessagePassing):
+    def __init__(self, in_channels, out_channels):
+        super(MPL, self).__init__(aggr='add')
+        self.mlp1 = torch.nn.Linear(in_channels*2, out_channels)
+        self.mlp2 = torch.nn.Linear(in_channels, out_channels)
+        self.mlp3 = torch.nn.Linear(2*out_channels, 1)
+        self.mlp4 = torch.nn.Linear(2*out_channels, 1)
+        self.mlp5 = torch.nn.Linear(in_channels,16)
+        self.mlp6 = torch.nn.Linear(out_channels,16)
+        self.mlp7 = torch.nn.Linear(16,1)
+
+    def forward(self, x, edge_index):
+#         edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
+        msg = self.propagate(edge_index, x=x.float())
+        x = F.relu(self.mlp2(x))
+        w1 = F.sigmoid(self.mlp3(torch.cat([x,msg], dim=1)))
+        w2 = F.sigmoid(self.mlp4(torch.cat([x,msg], dim=1)))
+        out = w1*msg + w2*x
+        
+        return out
+
+    def message(self, x_i, x_j, edge_index):
+        msg = F.relu(self.mlp1(torch.cat([x_i, x_j-x_i], dim=1)))
+        w1 = F.tanh(self.mlp5(x_i))
+        w2 = F.tanh(self.mlp6(msg))
+        w = self.mlp7(w1*w2)
+        w = softmax(w, edge_index[0])
+        return msg*w
+
+class MPLNNRegressor(torch.nn.Module):
+    def __init__(self,in_channels):
+        super(MPLNNRegressor, self).__init__()
+        self.conv1 = MPL(in_channels,128 )
+        self.conv2 = MPL(128,64)
+        self.conv3 = MPL(64,64 )
+        self.conv4 = MPL(64,64 )
+        self.lin1 = torch.nn.Linear(128, 128)
+        self.lin2 = torch.nn.Linear(128, 16)
+        self.lin3 = torch.nn.Linear(16, 16)
+        self.lin4 = torch.nn.Linear(16, 1)
+        self.lin5 = torch.nn.Linear(128, 128)
+        self.lin6 = torch.nn.Linear(128, 16)
+        self.lin7 = torch.nn.Linear(16, 16)
+        self.lin8 = torch.nn.Linear(16, 1)
+        self.global_att_pool1 = AttentionalAggregation(torch.nn.Sequential(torch.nn.Linear(64, 1)))
+        self.global_att_pool2 = AttentionalAggregation(torch.nn.Sequential(torch.nn.Linear(64, 1)))
+    
+    def forward(self, data):
+        x, edge_index, batch = data.x.float(), data.edge_index, data.batch
+        x = F.relu(self.conv1(x, edge_index))
+        x = F.relu(self.conv2(x, edge_index))
+        x1 = self.global_att_pool1(x, batch)
+        x = F.relu(self.conv3(x, edge_index))
+        x = F.relu(self.conv4(x, edge_index))
+        x2 = self.global_att_pool2(x, batch)
+        x_out = torch.cat([x1, x2], dim=1)
+        x = F.relu(self.lin1(x_out))
+        x = F.relu(self.lin2(x))
+        x = self.lin3(x)
+        x = self.lin4(x).squeeze(1)
+
+        return x
