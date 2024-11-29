@@ -7,7 +7,7 @@ import os,sys
 
 import argparse
 import matplotlib.pyplot as plt
-from models import GATRegressor,GATv2Regressor
+from tools.training.models import GATRegressor,GATv2Regressor
 import pickle
 
 import itertools
