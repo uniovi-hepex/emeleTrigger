@@ -6,7 +6,6 @@ Repository for the UniOvi code for this.
 Contributors:
 - Santiago Folgueras
 - Pietro Vischia
-- Artur Kalinowski
 - Pelayo Leguina
 
 
