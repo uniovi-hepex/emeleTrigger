@@ -1,4 +1,6 @@
 # Ignore everything
-*
+*pkl
+*root
+*csv
 # ...except for this gitignore
 !.gitignore
