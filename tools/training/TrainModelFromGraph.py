@@ -7,7 +7,7 @@ import os,sys
 
 import argparse
 import matplotlib.pyplot as plt
-from tools.training.models import GATRegressor,GATv2Regressor
+from tools.training.models import GATRegressor, GraphSAGEModel, MPLNNRegressor
 import pickle
 
 import itertools
@@ -229,20 +229,20 @@ class TrainModelFromGraph:
             break  # Only draw the first batch
 
     def initialize_model(self):
-        num_node_features = 5
+        num_node_features = 3
         num_edge_features = 2
-        hidden_dim = self.batch_size
+        hidden_dim = 32
         output_dim = 1 ## ONE FEATURE ONLY!!!
         print(f"Using device: {self.device}")
         if self.model_type == 'GAT':
-            self.model = GATRegressor(num_node_features, hidden_dim, output_dim).to(self.device)
-        elif self.model_type == 'GATv2':
-            self.model = GATv2Regressor(num_node_features, hidden_dim, output_dim).to(self.device)
-        elif self.model_type == 'GATwithDropout':
-            self.model = GATRegressorDO(num_node_features, hidden_dim, output_dim).to(self.device)
+            self.model = GATRegressor(num_node_features=num_node_features, hidden_dim=hidden_dim, output_dim=output_dim).to(self.device)
+        elif self.model_type == 'SAGE':
+            self.model = GraphSAGEModel(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
+        elif self.model_type == 'MPNN':
+            self.model = MPLNNRegressor(in_channels=num_node_features).to(self.device)
         
         #self.model = torch_geometric.compile(self.model)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.75)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         print("Model initialized")
         print(self.model)
 
@@ -389,12 +389,12 @@ class TrainModelFromGraph:
 
 def main():
 
-    parser = argparse.ArgumentParser(description="Train and evaluate GAT model")
+    parser = argparse.ArgumentParser(description="Train and evaluate GNN model")
     parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
     parser.add_argument('--graph_name', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Name of the graph data')
     parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
-    parser.add_argument('--model_type', type=str, default='GAT', help='Model to use for training')
+    parser.add_argument('--batch_size', type=int, default=1024, help='Batch size for training')
+    parser.add_argument('--model_type', type=str, default='SAGE', help='Model to use for training')
     parser.add_argument('--plot_graph_features', action='store_true', help='Plot the graph features')
     parser.add_argument('--normalize_features', action='store_true', help='Normalize node features')
     parser.add_argument('--normalize_targets', action='store_true', help='Normalize target features')
