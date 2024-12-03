@@ -31,6 +31,7 @@ class TrainModelFromGraph:
         parser.add_argument('--hidden_dim', type=int, default=32, help='Hidden dimension for the model')
         parser.add_argument('--normalization', type=str, default='NodesAndEdgesAndOnlySpatial', help='Type of normalization to apply')
         parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
+        parser.add_argument('--device', type=str, default='cuda', help='Device to use for training')
         return parser
 
     def __init__(self, **kwargs):
@@ -48,6 +49,7 @@ class TrainModelFromGraph:
         self.model_type = kwargs.get('model_type', 'SAGE')
         self.normalization = kwargs.get('normalization', 'NodesAndEdgesAndOnlySpatial')
         self.num_files = kwargs.get('num_files', None)  # Número de archivos a cargar
+        self.device = kwargs.get('device', 'cuda')
         
         # Initialize other attributes
         self.train_loader = None
@@ -230,6 +232,7 @@ def main():
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--do_train', action='store_true', help='Train the model')
     parser.add_argument('--do_validation', action='store_true', help='Evaluate the model')
+    parser.add_argument('--device', type=str, default='cuda', help='Device to use for training')
 
     args = parser.parse_args()
 
