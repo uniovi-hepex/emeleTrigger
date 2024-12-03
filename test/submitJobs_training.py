@@ -8,6 +8,8 @@ InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_2411
 queue = "workday" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
 OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Model_v240725_Bsize64_lr5e-4_NOnormNodes_GAT_241106/"
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/TrainingModel/"
+ModelTypes = ['SAGE', 'MPNN']
+NormalizationTypes = ['DropLastTwoNodeFeatures', 'NodesAndEdgesAndOnlySpatial']
 ########   customization end   #########
 
 path = os.getcwd()
@@ -30,21 +32,24 @@ print("InputFolder: %s" %(InputFolder))
 print("OutputDir: %s" %(OutputDir))
 
 ##### creating job #####
-
-with open('%s/exec/job_train_model.sh' %(WORKDIR), 'w') as fout:
-    fout.write("#!/bin/sh\n")
-    fout.write("echo\n")
-    fout.write("echo\n")
-    fout.write("echo 'START---------------'\n")
-    fout.write("echo 'WORKDIR ' ${PWD}\n")
-    fout.write("cd "+str(path)+"\n")
-    fout.write("source pyenv/bin/activate\n")
-    fout.write("echo 'Saving Model in  %s' \n" %(OutputDir))
-    fout.write("python tools/training/TrainModelFromGraph.py --graph_path %s --out_path %s --do_train \n" %(InputFolder, OutputDir))  
-    fout.write("echo 'STOP---------------'\n")
-    fout.write("echo\n")
-    fout.write("echo\n")
-os.system("chmod 755 %s/exec/job_train_model.sh" %(WORKDIR))
+file_count = 1
+for model in ModelTypes:
+    for normalization in NormalizationTypes: 
+        SaveTag = model + "_" + normalization + "_Bsize1024_lr1e-3_241203"
+        with open('%s/exec/job_train_model_%02d.sh' %(WORKDIR, file_count), 'w') as fout:
+            fout.write("#!/bin/sh\n")
+            fout.write("echo\n")
+            fout.write("echo\n")
+            fout.write("echo 'START---------------'\n")
+            fout.write("echo 'WORKDIR ' ${PWD}\n")
+            fout.write("cd "+str(path)+"\n")
+            fout.write("source pyenv/bin/activate\n")
+            fout.write("echo 'Saving Model in  %s' \n" %(OutputDir))
+            fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --out_path %s --do_train --save_tag %s --batch_size 1024 --learning_rate 0.001\n" %(model, normalization, InputFolder, OutputDir, SaveTag))  
+            fout.write("echo 'STOP---------------'\n")
+            fout.write("echo\n")
+            fout.write("echo\n")
+        os.system("chmod 755 %s/exec/job_train_model_%02d.sh" %(WORKDIR, file_count))
 
 ###### create submit.sub file ####
 with open('submit.sub', 'w') as fout:
@@ -60,7 +65,7 @@ with open('submit.sub', 'w') as fout:
 
 ###### sends bjobs ######
 os.system("echo submit.sub")
-os.system("condor_submit submit.sub")
+#os.system("condor_submit submit.sub")
 
 print()
 print("your jobs:")

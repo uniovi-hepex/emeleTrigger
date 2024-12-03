@@ -22,7 +22,7 @@ class TrainModelFromGraph:
         parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
         parser.add_argument('--save_tag', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Tag for saving the model')
         parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
-        parser.add_argument('--learning_rate', type=float, default=0.0005, help='Learning rate for training')
+        parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for training')
         parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
         parser.add_argument('--model_path', type=str, default=None, help='Path to the saved model for evaluation')
         parser.add_argument('--do_validation', action='store_true', help='Evaluate the model')
@@ -147,7 +147,7 @@ class TrainModelFromGraph:
         
     def initialize_model(self):
         num_node_features = 3
-        hidden_dim = 32
+        hidden_dim = self.hidden_dim
         output_dim = 1 ## ONE FEATURE ONLY!!!
         print(f"Using device: {self.device}")
         if self.model_type == 'GAT':
@@ -224,7 +224,7 @@ def main():
     parser.add_argument('--plot_graph_features', action='store_true', help='Plot the graph features')
     parser.add_argument('--normalization', type=str, default='NodesAndEdgesAndOnlySpatial', help='Type of normalization to apply')
     parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
-    parser.add_argument('--learning_rate', type=float, default=0.005, help='Learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for training')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for training')
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
