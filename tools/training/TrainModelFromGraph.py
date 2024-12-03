@@ -111,21 +111,32 @@ class TrainModelFromGraph:
         ### NOW FILTER EMPTY GRAPHS... 
         Graphs_for_training_reduced = Graphs_for_training
         Graphs_for_training_filtered = [
-            g for g in Graphs_for_training_filtered
-            if not (torch.isnan(g.x).any() or torch.isnan(g.edge_attr).any() or torch.isnan(g.y).any() or g.edge_index.size(1) == 0)
+            g for g in Graphs_for_training_reduced
+            if not (torch.isnan(g.y).any() or torch.isnan(g.x).any())  and g.edge_index.size(1) > 0
         ]
-        
+
         # remove extra dimension in y and put deltaPhi and deltaEta in the data object as edge_attr
         for i in range(0, len(Graphs_for_training_filtered)):
             Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
             Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)        
 
+
+        Graphs_for_training_filtered = [
+            g for g in Graphs_for_training_filtered
+            if not (torch.isnan(g.x).any() or torch.isnan(g.edge_attr).any() or torch.isnan(g.y).any())
+        ]
+        
         print(f"Total Graphs: {len(Graphs_for_training)}")
         print(f"Filtered Graphs: {len(Graphs_for_training_filtered)}")
 
         # Apply transformations to the load data... 
         if self.transform is not None:
             Graphs_for_training_filtered = [self.transform(data) for data in Graphs_for_training_filtered]
+
+        Graphs_for_training_filtered = [
+            g for g in Graphs_for_training_filtered
+            if not (torch.isnan(g.x).any() or torch.isnan(g.edge_attr).any() or torch.isnan(g.y).any())
+        ]
 
         # Train and test split:
         events = len(Graphs_for_training_filtered)
@@ -166,7 +177,7 @@ class TrainModelFromGraph:
         print("Model initialized")
         print(self.model)
 
-    def train(self, loader):
+    def train_model(self, loader):
         self.model.train()
         total_loss = 0
         for data in loader:       
@@ -178,10 +189,10 @@ class TrainModelFromGraph:
             self.optimizer.step()
             total_loss += loss.item()
 
-        return total_loss / len(loader.dataset)
+        return total_loss / len(loader)
 
     @torch.no_grad()
-    def test(self, loader):
+    def test_model(self, loader):
         self.model.eval()
         
         total_loss = 0
@@ -190,7 +201,7 @@ class TrainModelFromGraph:
             out = self.model(data)
             loss = self.loss_fn(out, data.y.view(out.size()))
             total_loss += loss.item()
-        return total_loss / len(loader.dataset)
+        return total_loss / len(loader)
 
     def Training_loop(self):
 
@@ -200,10 +211,10 @@ class TrainModelFromGraph:
         
         print("Start training...")
         for epoch in range(self.epochs):
-            train_loss = self.train(self.train_loader)
-            test_loss = self.test(self.test_loader)
+            train_loss = self.train_model(self.train_loader)
+            test_loss = self.test_model(self.test_loader)
             if (epoch + 1) % 10 == 0:
-                print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}, Train accuracy: {train_accuracy:.4f}, Test accuracy: {test_accuracy:.4f}')
+                print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
                 torch.save(self.model, f"{self.out_path}/model_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pth")
 
     def set_model_path(self, path):

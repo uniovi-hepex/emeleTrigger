@@ -12,6 +12,7 @@ ModelTypes = ['SAGE', 'MPNN']
 NormalizationTypes = ['DropLastTwoNodeFeatures', 'NodesAndEdgesAndOnlySpatial']
 InputGraphs = ["3neighbours_muonQOverPt/", "all_connections_muonQOverPt/"]
 GraphName = "vix_graph_6Nov"
+Epochs = 50
 ########   customization end   #########
 
 path = os.getcwd()
@@ -55,7 +56,7 @@ for model in ModelTypes:
                 fout.write("cd "+str(path)+"\n")
                 fout.write("source pyenv/bin/activate\n")
                 fout.write("echo 'Saving Model in  %s' \n" %(OutputDir))
-                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --out_path %s --do_train --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 20 --graph_name %s\n" %(model, normalization, InputFolder+input_graph, OutputDir, SaveTag, GraphName))  
+                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --out_path %s --do_train --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 20 --graph_name %s --epochs %d\n" %(model, normalization, InputFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs))  
                 fout.write("echo 'STOP---------------'\n")
                 fout.write("echo\n")
                 fout.write("echo\n")
