@@ -8,7 +8,7 @@ import os,sys
 import argparse
 import matplotlib.pyplot as plt
 from models import GATRegressor, GraphSAGEModel, MPLNNRegressor
-from transformations import NormalizeNodeEdgesAndDropTwoFeatures,DropLastTwoNodeFeatures,NormalizeNodeFeatures,NormalizeEdgeFeatures,NormalizeTargets
+from transformations import DropLastTwoNodeFeatures,NormalizeNodeFeatures,NormalizeEdgeFeatures,NormalizeTargets
 import pickle
 
 import itertools
@@ -63,7 +63,7 @@ class TrainModelFromGraph:
         # Apply transformations if necessary
         self.transform = None
         if self.normalization == 'NodesAndEdgesAndOnlySpatial':
-            self.transform = NormalizeNodeEdgesAndDropTwoFeatures()
+            self.transform = Compose([NormalizeNodeFeatures(),NormalizeEdgeFeatures(),DropLastTwoNodeFeatures()])
         elif self.normalization == 'NodesAndEdges':
             self.transform = Compose([NormalizeNodeFeatures(),NormalizeEdgeFeatures()])
         elif self.normalization == 'Nodes':
