@@ -7,8 +7,8 @@ import os,sys
 
 import argparse
 import matplotlib.pyplot as plt
-from tools.training.models import GATRegressor, GraphSAGEModel, MPLNNRegressor
-from tools.training.transformations import NormalizeNodeEdgesAndDropTwoFeatures
+from models import GATRegressor, GraphSAGEModel, MPLNNRegressor
+from transformations import NormalizeNodeEdgesAndDropTwoFeatures
 import pickle
 
 import itertools
