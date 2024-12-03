@@ -87,7 +87,7 @@ class TrainModelFromGraph:
         all_files = os.listdir(self.graph_path)
 
         # Filter for .pkl files
-        graph_files = [f for f in all_files if (f.endswith('.pkl') or f.endswith('.pt')) and graph_name in f]
+        graph_files = [f for f in all_files if (f.endswith('.pkl') or f.endswith('.pt')) and self.graph_name in f]
         if not graph_files:
             print("No .pkl/.pt files found in the directory.")
             return []
