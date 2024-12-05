@@ -80,7 +80,7 @@ for model in ModelTypes:
                 fout.write("cd "+str(path)+"\n")
                 fout.write("source pyenv/bin/activate\n")
                 fout.write("echo 'Saving Model in  %s' \n" %(OutputDir))
-                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --output_dir --plot_graph_features %s --do_validation --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 5 --graph_name %s --epochs %d --model_path %s/%s\n" %(model, normalization, GraphFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs, ModelFolder,ModelFile))
+                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --output_dir %s --plot_graph_features --do_validation --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 5 --graph_name %s --epochs %d --model_path %s/%s\n" %(model, normalization, GraphFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs, ModelFolder,ModelFile))
                 fout.write("echo 'STOP---------------'\n")
                 fout.write("echo\n")
                 fout.write("echo\n")
