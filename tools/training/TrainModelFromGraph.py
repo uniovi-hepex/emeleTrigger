@@ -19,7 +19,7 @@ class TrainModelFromGraph:
     def add_args(parser):
         parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
         parser.add_argument('--graph_name', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Name of the graph data')
-        parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
+        parser.add_argument('--out_model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
         parser.add_argument('--save_tag', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Tag for saving the model')
         parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
         parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for training')
@@ -37,7 +37,7 @@ class TrainModelFromGraph:
     def __init__(self, **kwargs):
         self.graph_path = kwargs.get('graph_path', 'graph_folder')
         self.graph_name = kwargs.get('graph_name', 'vix_graph_13Nov_3_muonQOverPt')
-        self.out_path = kwargs.get('out_path', 'Bsize_gmp_64_lr5e-4_v3')
+        self.out_model_path = kwargs.get('out_model_path', 'Bsize_gmp_64_lr5e-4_v3')
         self.save_tag = kwargs.get('save_tag', 'vix_graph_13Nov_3_muonQOverPt')
         self.batch_size = kwargs.get('batch_size', 1024)
         self.learning_rate = kwargs.get('learning_rate', 0.001)
@@ -80,7 +80,38 @@ class TrainModelFromGraph:
         else: 
             print("Unknown normalization type, exiting...")
             sys.exit(1)
-        
+    ### Add setter functions for all parameters: 
+    def set_graph_path(self, path):
+        self.graph_path = path
+    def set_graph_name(self, name):
+        self.graph_name = name
+    def set_out_model_path(self, path):
+        self.out_model_path = path
+    def set_save_tag(self, tag):
+        self.save_tag = tag
+    def set_batch_size(self, batch_size):
+        self.batch_size = batch_size
+    def set_learning_rate(self, learning_rate):
+        self.learning_rate = learning_rate
+    def set_epochs(self, epochs):
+        self.epochs = epochs
+    def set_model_path(self, model_path):
+        self.model_path = model_path
+    def set_do_validation(self, do_validation):
+        self.do_validation = do_validation
+    def set_do_train(self, do_train):
+        self.do_train = do_train
+    def set_hidden_dim(self, hidden_dim):
+        self.hidden_dim = hidden_dim
+    def set_model_type(self, model_type):
+        self.model_type = model_type
+    def set_normalization(self, normalization):
+        self.normalization = normalization
+    def set_num_files(self, num_files):
+        self.num_files = num_files
+    def set_device(self, device):
+        self.device = device
+    
     def load_data(self):
         # Loading data from graph and convert it to DataLoader
         graphs = []
@@ -215,14 +246,18 @@ class TrainModelFromGraph:
             test_loss = self.test_model(self.test_loader)
             if (epoch + 1) % 10 == 0:
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
-                torch.save(self.model, f"{self.out_path}/model_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pth")
+                torch.save(self.model.state_dict(), f"{self.out_path}/model_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pth")
 
     def set_model_path(self, path):
         self.model_path = path
         
     def load_trained_model(self):
         print(f"Loading model from {self.model_path}")
-        self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
+        # load the model, first try state_dict then the model itself
+        try:
+            self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
+        except:
+            self.model = torch.load(self.model_path, map_location=self.device)
             
 def main():
 
@@ -253,17 +288,17 @@ def main():
     trainer.initialize_model()
 
     if args.plot_graph_features: 
-        from tools.training.validation import plot_graph_feature_histograms
-        plot_graph_feature_histograms(trainer.train_loader)
+        from validation import plot_graph_feature_histograms
+        plot_graph_feature_histograms(trainer.train_loader, output_dir=args.output_dir,label=trainer.model_type+"_"+trainer.save_tag)
 
     if args.do_train:
         trainer.Training_loop()
 
     if args.do_validation:
         trainer.load_trained_model()
-        from tools.training.validation import plot_prediction_results, evaluate_model
+        from validation import plot_prediction_results, evaluate_model
         regression,prediction = evaluate_model(trainer.model, trainer.test_loader, trainer.device)
-        plot_prediction_results(regression, prediction, output_dir=args.output_dir,label=trainer.model_type)
+        plot_prediction_results(regression, prediction, output_dir=args.output_dir,model=trainer.model_type, label=trainer.save_tag)
 
 
 if __name__ == "__main__":

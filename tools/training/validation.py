@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
-def plot_graph_feature_histograms(data_loader):   
+def plot_graph_feature_histograms(data_loader, output_dir='Train', label='Model'):   
     feature_names = ["eta", "phi", "R",  "deltaPhi", "deltaEta","Q/pt"]
     for batch in data_loader:
         features = batch.x.numpy()
@@ -33,7 +34,12 @@ def plot_graph_feature_histograms(data_loader):
         axs[num_features + (batch.edge_attr.shape[1])].set_ylabel('Frequency')
               
         plt.tight_layout()
-        plt.show()
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        fig.savefig(os.path.join(output_dir, f'{label}_inputFeatures.png'))
+        fig.savefig(os.path.join(output_dir, f'{label}_inputFeatures.pdf'))
+        fig.savefig(os.path.join(output_dir, f'{label}_inputFeatures.eps'))
+
         break  # Only draw the first batch
 
 @torch.no_grad()
@@ -55,7 +61,7 @@ def evaluate_model(model, test_loader, device):
     
     return all_regression, all_prediction
 
-def plot_prediction_results(regression, prediction, output_dir='Test', label='Model'):
+def plot_prediction_results(regression, prediction, output_dir='Test', model='model', label='SaveModel'):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -64,19 +70,19 @@ def plot_prediction_results(regression, prediction, output_dir='Test', label='Mo
     print("Plotting Regression target")
     axs[0].hist(regression, bins=np.arange(-0.5,0,0.006), alpha=0.75, label='Regression target')
     axs[0].hist(prediction, bins=np.arange(-0.5,0,0.006), alpha=0.75, label='Prediction')
-    axs[0].set_title(f'Regression target and prediction for {label}')
+    axs[0].set_title(f'Regression target and prediction for {model}')
     axs[0].set_xlabel('Value')
     axs[0].set_ylabel('Frequency')
     axs[0].legend()
 
     axs[1].scatter(regression, prediction, alpha=0.5)
     axs[1].plot([min(prediction), max(prediction)], [min(prediction), max(prediction)], color='red', linestyle='--') # Line of equality
-    axs[1].set_title(f'Regression target vs prediction for {label}')
+    axs[1].set_title(f'Regression target vs prediction for {model}')
     axs[1].set_xlabel('Regression target')
     axs[1].set_ylabel('Prediction')
 
     axs[2].hist(prediction - regression, bins=30, alpha=0.75)
-    axs[2].set_title(f'Residuals for {label}')
+    axs[2].set_title(f'Residuals for {model}')
     axs[2].set_xlabel('Residual')
     axs[2].set_ylabel('Frequency')
     
@@ -87,9 +93,11 @@ def plot_prediction_results(regression, prediction, output_dir='Test', label='Mo
     # Add text box with bias and resolution
     textstr = f'Bias: {bias:.4f}\nResolution: {resolution:.4f}'
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    axs[1].text(0.95, 0.95, textstr, transform=axs[1].transAxes, fontsize=12,
+    axs[2].text(0.95, 0.95, textstr, transform=axs[1].transAxes, fontsize=12,
                 verticalalignment='top', horizontalalignment='right', bbox=props)
 
     plt.tight_layout()
     fig.savefig(os.path.join(output_dir, f'{label}_prediction_results.png'))
+    fig.savefig(os.path.join(output_dir, f'{label}_prediction_results.pdf'))
+    fig.savefig(os.path.join(output_dir, f'{label}_prediction_results.eps'))
 
