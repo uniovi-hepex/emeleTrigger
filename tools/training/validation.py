@@ -93,7 +93,7 @@ def plot_prediction_results(regression, prediction, output_dir='Test', model='mo
     # Add text box with bias and resolution
     textstr = f'Bias: {bias:.4f}\nResolution: {resolution:.4f}'
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    axs[2].text(0.95, 0.95, textstr, transform=axs[1].transAxes, fontsize=12,
+    axs[2].text(0.95, 0.95, textstr, transform=axs[2].transAxes, fontsize=12,
                 verticalalignment='top', horizontalalignment='right', bbox=props)
 
     plt.tight_layout()

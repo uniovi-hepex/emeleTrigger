@@ -84,7 +84,7 @@ for model in ModelTypes:
                 fout.write("echo 'STOP---------------'\n")
                 fout.write("echo\n")
                 fout.write("echo\n")
-            os.system("chmod 755 %s/exec/job_train_model_%02d.sh" %(WORKDIR, file_count))
+            os.system("chmod 755 %s/exec/job_plot_model_%02d.sh" %(WORKDIR, file_count))
 
 ###### create submit.sub file ####
 with open('submit.sub', 'w') as fout:
@@ -93,14 +93,13 @@ with open('submit.sub', 'w') as fout:
     fout.write("output                  = %s/batchlogs/$(ClusterId).$(ProcId).out\n" %(WORKDIR))
     fout.write("error                   = %s/batchlogs/$(ClusterId).$(ProcId).err\n"    %(WORKDIR))
     fout.write("log                     = %s/batchlogs/$(ClusterId).log\n"             %(WORKDIR))
-    fout.write("request_gpus            = 1\n")
     fout.write('+JobFlavour = "%s"\n' %(queue))
     fout.write("\n")
     fout.write("queue filename matching (%s/exec/job_*sh)\n" %(WORKDIR))
 
 ###### sends bjobs ######
 os.system("echo submit.sub")
-#os.system("condor_submit submit.sub")
+os.system("condor_submit submit.sub")
 
 print()
 print("your jobs:")
