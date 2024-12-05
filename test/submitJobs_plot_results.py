@@ -41,7 +41,7 @@ if JustPrint:
     sys.exit()
 
 ### NOW SUBMIT THE JOBS
-queue = "microcentury"
+queue = "espresso"
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/PlotModel/"
 
 path = os.getcwd()
