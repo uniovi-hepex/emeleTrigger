@@ -289,7 +289,7 @@ def main():
 
     if args.plot_graph_features: 
         from validation import plot_graph_feature_histograms
-        plot_graph_feature_histograms(trainer.train_loader, output_dir=args.output_dir,label=trainer.model_type+"_"+trainer.save_tag)
+        plot_graph_feature_histograms(trainer.train_loader, output_dir=args.output_dir,label=trainer.save_tag)
 
     if args.do_train:
         trainer.Training_loop()
