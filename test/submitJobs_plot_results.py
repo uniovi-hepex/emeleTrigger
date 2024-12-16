@@ -1,19 +1,48 @@
-#!/usr/bin/env python
 import os,sys
 
 print('START\n')
 ########   YOU ONLY NEED TO FILL THE AREA BELOW   #########
 ########   customization  area #########
-InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_241106/" # list with all the file directories
-queue = "workday" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Model_Graphsv240725_QOverPtRegression_241203/"
-WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/TrainingModel/"
+GraphFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_241106/" # list with all the file directories
+ModelFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Model_Graphsv240725_QOverPtRegression_241203/"
 ModelTypes = ['SAGE', 'MPNN']
 NormalizationTypes = ['DropLastTwoNodeFeatures', 'NodesAndEdgesAndOnlySpatial']
 InputGraphs = ["3neighbours_muonQOverPt/", "all_connections_muonQOverPt/"]
 GraphName = "vix_graph_6Nov"
 Epochs = 50
+OutputDir = "/eos/user/f/folguera/www/INTREPID/2024_12_04_GNN_QOverPtRegression/"
+JustPrint = True
 ########   customization end   #########
+
+
+if JustPrint:
+    print("##########################")
+    print("source pyenv/bin/activate\n")
+
+    if not os.path.exists(OutputDir):
+        print("OutputDir %s does not exist" %(OutputDir))
+        os.system("mkdir %s" %(OutputDir))
+        
+    for model in ModelTypes:
+        for normalization in NormalizationTypes: 
+            for input_graph in InputGraphs:
+                SaveTag = model + "_" + normalization + "_Bsize64_lr5e-4_241106_20files_"
+                if "all" in input_graph:
+                    SaveTag = SaveTag + "allConnections"
+                else:
+                    SaveTag = SaveTag + "3neighbours"
+                ModelFile = f'model_{model}_32dim_50epochs_{SaveTag}.pth'
+
+                print("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --output_dir %s --do_validation --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 5 --graph_name %s --epochs %d --model_path %s/%s &\n" %(model, normalization, GraphFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs, ModelFolder,ModelFile))
+
+
+
+    print("##########################")
+    sys.exit()
+
+### NOW SUBMIT THE JOBS
+queue = "espresso"
+WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/PlotModel/"
 
 path = os.getcwd()
 print('do not worry about folder creation:\n')
@@ -30,24 +59,19 @@ else :
     print("OutputDir: %s" %(OutputDir))
 
 
-## print info
-print("InputFolder: %s" %(InputFolder))
-print("OutputDir: %s" %(OutputDir))
-
-##### creating job #####
 file_count = 0
 for model in ModelTypes:
     for normalization in NormalizationTypes: 
         for input_graph in InputGraphs:
             file_count += 1
-            print("Creating job for model %s with normalization %s and input graphs %s" %(model, normalization, input_graph))
             SaveTag = model + "_" + normalization + "_Bsize64_lr5e-4_241106_20files_"
             if "all" in input_graph:
                 SaveTag = SaveTag + "allConnections"
             else:
                 SaveTag = SaveTag + "3neighbours"
-    
-            with open('%s/exec/job_train_model_%02d.sh' %(WORKDIR, file_count), 'w') as fout:
+            ModelFile = f'model_{model}_32dim_50epochs_{SaveTag}.pth'
+
+            with open('%s/exec/job_plot_model_%02d.sh' %(WORKDIR, file_count), 'w') as fout:
                 fout.write("#!/bin/sh\n")
                 fout.write("echo\n")
                 fout.write("echo\n")
@@ -56,11 +80,11 @@ for model in ModelTypes:
                 fout.write("cd "+str(path)+"\n")
                 fout.write("source pyenv/bin/activate\n")
                 fout.write("echo 'Saving Model in  %s' \n" %(OutputDir))
-                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --out_path %s --do_train --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 20 --graph_name %s --epochs %d\n" %(model, normalization, InputFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs))  
+                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --output_dir %s --plot_graph_features --do_validation --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 5 --graph_name %s --epochs %d --model_path %s/%s\n" %(model, normalization, GraphFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs, ModelFolder,ModelFile))
                 fout.write("echo 'STOP---------------'\n")
                 fout.write("echo\n")
                 fout.write("echo\n")
-            os.system("chmod 755 %s/exec/job_train_model_%02d.sh" %(WORKDIR, file_count))
+            os.system("chmod 755 %s/exec/job_plot_model_%02d.sh" %(WORKDIR, file_count))
 
 ###### create submit.sub file ####
 with open('submit.sub', 'w') as fout:
@@ -69,7 +93,6 @@ with open('submit.sub', 'w') as fout:
     fout.write("output                  = %s/batchlogs/$(ClusterId).$(ProcId).out\n" %(WORKDIR))
     fout.write("error                   = %s/batchlogs/$(ClusterId).$(ProcId).err\n"    %(WORKDIR))
     fout.write("log                     = %s/batchlogs/$(ClusterId).log\n"             %(WORKDIR))
-    fout.write("request_gpus            = 1\n")
     fout.write('+JobFlavour = "%s"\n' %(queue))
     fout.write("\n")
     fout.write("queue filename matching (%s/exec/job_*sh)\n" %(WORKDIR))
