@@ -36,8 +36,21 @@ class NormalizeSpecificNodeFeatures(BaseTransform):
 
 
 class OMTFDataset(Dataset):
-    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
-        super(OMTFDataset, self).__init__(root, transform, pre_transform, pre_filter)
+    def __init__(self, root_dir, muon_vars=None, stub_vars=None, transform=None):
+        '''
+        Args:
+            root_dir (str): Directory with all the .root files  
+            transform (BaseTransform, optional): Transformation to be applied to all data. Defaults to None.
+            muon_vars (list, optional): muon variables (y) to store in the dataset. Defaults to None.
+            stub_vars (list, optional): stub variables (x) to store in the dataset. Defaults to None.
+            connection_model (str, optional): Connection model to use. Defaults to 'knn'.
+        '''
+        super(OMTFDataset, self).__init__(root_dir, transform)
+        self.muon_vars = muon_vars
+        self.stub_vars = stub_vars
+        self.connection_model = connection_model
+        self.input_files = os.listdir(root_dir)
+        
         self.processed_file = os.path.join(self.processed_dir, 'data.pt')
 
     @property
