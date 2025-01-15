@@ -373,7 +373,6 @@ def main():
     parser = argparse.ArgumentParser(description="Graph Creation model")
     parser.add_argument("--data_path", type=str, default=None, help="Path to the data file")
     parser.add_argument("--graph_save_paths", type=str, default=None, help="Path to save the graph")
-    parser.add_argument("--create_dataset", action="store_true", help="Create the dataset")
     parser.add_argument("--model_connectivity", type=str, default="all", help="Model connectivity")
     parser.add_argument("--muon_vars", type=str, default="muonQPt", help="Muon variables")
     parser.add_argument("--stub_vars", type=str, default="stubEtaG", help="Stub variables")

@@ -3,7 +3,6 @@ import torch
 from torch_geometric.data import Dataset, Data
 from torch_geometric.transforms import BaseTransform
 
-
 class NormalizeNodeFeatures(BaseTransform):
     def __call__(self, data):
         if hasattr(data, 'x'):
@@ -37,85 +36,50 @@ class NormalizeSpecificNodeFeatures(BaseTransform):
 
 
 class OMTFDataset(Dataset):
-    def __init__(self, root_dir, tree_name, muon_vars=None, stub_vars=None, transform=None, pre_transform=None):
-        """
-        Args:
-            root_dir (str): Directorio que contiene los archivos ROOT.
-            tree_name (str): Nombre del árbol dentro de los archivos ROOT.
-            muon_vars (list of str, optional): Lista de variables de muones a extraer.
-            stub_vars (list of str, optional): Lista de variables de stubs a extraer.
-            transform (callable, optional): Una función/transformación que toma un objeto Data y lo devuelve transformado.
-            pre_transform (callable, optional): Una función/transformación que se aplica antes de guardar los datos.
-        """
-        self.root_dir = root_dir
-        self.tree_name = tree_name
-        self.muon_vars = muon_vars if muon_vars is not None else []
-        self.stub_vars = stub_vars if stub_vars is not None else []
-        self.transform = transform
-        self.pre_transform = pre_transform
-        self.dataset = self.load_data_from_root()
+    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
+        super(OMTFDataset, self).__init__(root, transform, pre_transform, pre_filter)
+        self.processed_file = os.path.join(self.processed_dir, 'data.pt')
 
-    def load_data_from_root(self):
-        """
-        Carga datos desde archivos ROOT utilizando uproot.
-        """
-        import os
+    @property
+    def raw_file_names(self):
+        # Devuelve una lista de nombres de archivos en el directorio raw
+        return [f for f in os.listdir(self.raw_dir) if f.endswith('.pt')]
+
+    @property
+    def processed_file_names(self):
+        return ['data.pt']
+
+    def download(self):
+        # No es necesario descargar nada, ya que los archivos .pt ya están en el directorio raw
+        pass
+
+    def process(self):
         data_list = []
-
-        for root_file in os.listdir(self.root_dir):
-            if root_file.endswith(".root"):
-                file_path = os.path.join(self.root_dir, root_file)
-                with uproot.open(file_path) as file:
-                    tree = file[self.tree_name]
-                    muon_data = {var: tree[var].array() for var in self.muon_vars}
-                    stub_data = {var: tree[var].array() for var in self.stub_vars}
-
-                    for i in range(len(stub_data[self.stub_vars[0]])):
-                        muon_sample = {var: muon_data[var][i] for var in self.muon_vars}
-                        stub_sample = {var: stub_data[var][i] for var in self.stub_vars}
-
-                        # Realizar operaciones con las variables y añadir algunas más
-                        stub_sample['new_var'] = stub_sample[self.stub_vars[0]] * 2  # Ejemplo de nueva variable
-
-                        # Crear nodos y aristas
-                        x = torch.tensor([stub_sample[var] for var in self.stub_vars], dtype=torch.float).view(-1, len(self.stub_vars))
-                        edge_index = self.create_edges(stub_sample[self.stub_vars[1]])
-
-                        data = Data(x=x, edge_index=edge_index, y=torch.tensor([muon_sample[var] for var in self.muon_vars], dtype=torch.float))
-                        if self.pre_transform is not None:
-                            data = self.pre_transform(data)
-                        data_list.append(data)
-
-        return data_list
-
-    def create_edges(self, stubLayer):
-        """
-        Crea aristas basadas en las capas de los stubs.
-        """
-        edge_index = []
-        for i in range(len(stubLayer)):
-            for j in range(i + 1, len(stubLayer)):
-                edge_index.append([i, j])
-                edge_index.append([j, i])
-        return torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        for raw_path in self.raw_paths:
+            data = torch.load(raw_path)
+            if self.pre_filter is not None and not self.pre_filter(data):
+                continue
+            if self.pre_transform is not None:
+                data = self.pre_transform(data)
+            data_list.append(data)
+        
+        data, slices = self.collate(data_list)
+        torch.save((data, slices), self.processed_file)
 
     def len(self):
-        return len(self.dataset)
+        return len(self.processed_paths)
 
     def get(self, idx):
-        data = self.dataset[idx]
-        if self.transform is not None:
-            data = self.transform(data)
-        return data
-    
+        data = torch.load(self.processed_file)
+        return data[idx]
+
 def main():
     import argparse
     from torch_geometric.data import DataLoader
+
     parser = argparse.ArgumentParser(description="OMTF Dataset")
     parser.add_argument('--data_dir', type=str, required=True, help='Directory containing .pt files')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for DataLoader')
-    parser.add_argument('--muon_vars', type=str, nargs='+', default=['muonQPt','muonPt','muonQOverPt','muonPropEta','muonPropPhi'], help='Muon variables to store in the dataset')
-    parser.add_argument('--stub_vars', type=str, nargs='+', default=['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType'], help='Stub variables to store in the dataset')
     args = parser.parse_args()
 
     # Definir transformaciones y filtros si es necesario
