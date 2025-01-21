@@ -13,6 +13,25 @@ import matplotlib.pyplot as plt
 NUM_PROCESSORS = 3
 NUM_PHI_BINS = 5400
 HW_ETA_TO_ETA_FACTOR=0.010875
+LOGIC_LAYERS_LABEL_MAP={
+            #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
+            # Put here catalog of names0
+            0: 'MB1',
+            2: 'MB2',
+            4: 'MB3',
+            6: 'ME1/3',
+            7: 'ME2/2',
+            8: 'ME3/2',
+            9: 'ME1/2',
+            10: 'RB1in',
+            11: 'RB1out',
+            12: 'RB2in',
+            13: 'RB2out',
+            14: 'RB3',
+            15: 'RE1/3',
+            16: 'RE2/3',
+            17: 'RE3/3'
+        }
 
 def get_global_phi(phi, processor):
     p1phiLSB = 2 * np.pi / NUM_PHI_BINS
@@ -78,6 +97,65 @@ def get_stub_r(stubTypes, stubEta, stubLayer, stubQuality):
         print('Tragic tragedy. R has len', len(rs), ', stubs have len', len(stubTypes))
     return np.array(rs, dtype=object)
     
+def getEtaKey(eta):
+    if abs(eta) < 0.92:
+        return 1
+    elif abs(eta) < 1.1:
+        return 2
+    elif abs(eta) < 1.15:
+        return 3
+    elif abs(eta) < 1.19:
+        return 4
+    else:
+        return 5
+    
+def getListOfConnectedLayers(eta):
+    etaKey=getEtaKey(eta)    
+
+    LAYER_ORDER_MAP = {
+            1: [10,0,11,12,2,13,14,4,6,15],
+            2: [10,0,11,12,2,13,6,15,16,7],
+            3: [10,0,11,6,15,16,7,8,17],
+            4: [10,0,11,16,7,8,17],
+            5: [10,0,9,16,7,8,17],
+    }
+    return LAYER_ORDER_MAP[etaKey]    
+
+def getEdgesFromLogicLayer(logicLayer,withRPC=True):
+    LOGIC_LAYERS_CONNECTION_MAP={
+            #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
+            # Put here catalog of names0
+            0: [2,4,6,7,8,9],   #MB1: [MB2, MB3, ME1/3, ME2/2]
+            4: [6],             #MB3: [ME1/3]
+            2: [4,6,7],         #MB2: [MB3, ME1/3]
+            6: [7,8],           #ME1/3: [ME2/2]
+            7: [8,9],           #ME2/2: [ME3/2]
+            8: [9],             #ME3/2: [RE3/3]
+            9: [],              #ME1/2: [RE2/3, ME2/2]
+    }
+    LOGIC_LAYERS_CONNECTION_MAP_WITH_RPC = {
+            0:  [2,4,6,7,8,9,10,11,12,13,14,15,16,17], 
+            2:  [4,6,7,10,11,12,13,14,15,16],       #MB2: [MB3, ME1/3]
+            4:  [6,10,11,12,13,14,15],         #MB3: [ME1/3]
+            6:  [7,8,10,11,12,13,14,15,16,17],         #ME1/3: [ME2/2]
+            7:  [8,9,10,11,15,16,17],         #ME2/2: [ME3/2]
+            8:  [9,10,11,15,16,17],        #ME3/2: [RE3/3]
+            9:  [7,10,16,17],         #ME1/2: [RE2/3, ME2/2]
+            10: [11,12,13,14,15,16,17],
+            11: [12,13,14,15,16,17],
+            12: [13,14,15,16],
+            13: [14,15,16],
+            14: [15],
+            15: [16,17],
+            16: [17],
+            17: []
+    }
+        
+    if (withRPC):
+        return (LOGIC_LAYERS_CONNECTION_MAP_WITH_RPC[logicLayer])
+    else:
+        if (logicLayer>=10): return []
+        return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer])
 
 class OMTFDataset(Dataset):
     def __init__(self, root_dir, tree_name, muon_vars=None, stub_vars=None, transform=None, pre_transform=None, dataset=None, max_files=None, max_events=None):
@@ -142,9 +220,8 @@ class OMTFDataset(Dataset):
                         muon_sample = {var: df[var].iloc[i] for var in self.muon_vars}
                         stub_sample = {var: df[var].iloc[i] for var in self.stub_vars}
 
-                        # Realizar operaciones con las variables y añadir algunas más
-                        stub_sample['new_var'] = stub_sample[self.stub_vars[0]] * 2  # Ejemplo de nueva variable
-
+                        # Convert the list of numpy.ndarrays to a single numpy.ndarray
+                        
                         # Crear nodos y aristas
                         x = torch.tensor([stub_sample[var] for var in self.stub_vars], dtype=torch.float).view(-1, len(self.stub_vars))
                         edge_index = self.create_edges(stub_sample[self.stub_vars[1]])
