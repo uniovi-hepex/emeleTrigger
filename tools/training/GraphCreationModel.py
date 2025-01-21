@@ -223,6 +223,17 @@ class GraphCreationModel():
         else:
             if (logicLayer>=10): return []
             return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer])
+    
+    def getNodeWeight(self,stubType):
+        if stubType == 3:
+            return 3
+        elif stubType == 9:
+            return 2
+        else:
+            return 1
+        
+    def getEdgeWeight(self,type1,type2):
+        return self.getNodeWeight(type1) + self.getNodeWeight(type2)
 
     def getDeltaPhi(self,phi1,phi2):
         dphi = phi1 - phi2
@@ -260,7 +271,7 @@ class GraphCreationModel():
                             target_node_index = row['stubLayer'].index(target_node_layer)
 
                             # Añadir arista usando etiquetas de stubLayer
-                            G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhiG'][stubId],row['stubPhiG'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]))
+                            G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhiG'][stubId],row['stubPhiG'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]), weight=self.getEdgeWeight(row['stubType'][stubId],row['stubType'][target_node_index]))
                 else: ##  connected to k-neighbours
                     connected_layers = self.getListOfConnectedLayers(row['stubEtaG'][stubId])
                     source_node_layer_index = connected_layers.index(stubLayer_label)
@@ -273,7 +284,7 @@ class GraphCreationModel():
                         target_node_index = row['stubLayer'].index(target_node_layer)
                                             
                         # Añadir arista usando etiquetas de stubLayer
-                        G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhiG'][stubId],row['stubPhiG'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]))
+                        G.add_edge(stubLayer_label, target_node_layer, deltaPhi=self.getDeltaPhi(row['stubPhiG'][stubId],row['stubPhiG'][target_node_index]), deltaEta=self.getDeltaEta(row['stubEtaG'][stubId],row['stubEtaG'][target_node_index]), weight=self.getEdgeWeight(row['stubType'][stubId],row['stubType'][target_node_index]))
             
             self.graphs.append(G)
         print('Graphs created and stored')

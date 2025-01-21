@@ -7,7 +7,7 @@ import os,sys
 
 import argparse
 import matplotlib.pyplot as plt
-from models import GATRegressor, GraphSAGEModel, MPLNNRegressor
+from models import GATRegressor, GraphSAGEModel, MPLNNRegressor, GCNRegressor
 from transformations import DropLastTwoNodeFeatures,NormalizeNodeFeatures,NormalizeEdgeFeatures,NormalizeTargets
 import pickle
 
@@ -200,7 +200,8 @@ class TrainModelFromGraph:
             self.model = GraphSAGEModel(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
         elif self.model_type == 'MPNN':
             self.model = MPLNNRegressor(in_channels=num_node_features).to(self.device)
-        
+        elif self.model_type == 'GCN':
+            self.model = GCNRegressor(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
         #self.model = torch_geometric.compile(self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.loss_fn = torch.nn.MSELoss()
@@ -247,6 +248,7 @@ class TrainModelFromGraph:
             if (epoch + 1) % 10 == 0:
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
                 torch.save(self.model.state_dict(), f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pth")
+                torch.save({'train_loss': train_loss, 'test_loss': test_loss}, f"{self.out_model_path}/loss_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pt")
 
     def set_model_path(self, path):
         self.model_path = path
@@ -264,8 +266,8 @@ def main():
     parser = argparse.ArgumentParser(description="Train and evaluate GNN model")
     parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
     parser.add_argument('--graph_name', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Name of the graph data')
-    parser.add_argument('--out_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
     parser.add_argument('--save_tag', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Tag for saving the model')
+    parser.add_argument('--out_model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output path for the results')
     parser.add_argument('--batch_size', type=int, default=1024, help='Batch size for training')
     parser.add_argument('--model_type', type=str, default='SAGE', help='Model to use for training')
     parser.add_argument('--hidden_dim', type=int, default=32, help='Hidden dimension for the model')

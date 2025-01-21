@@ -4,14 +4,15 @@ import os,sys
 print('START\n')
 ########   YOU ONLY NEED TO FILL THE AREA BELOW   #########
 ########   customization  area #########
-InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_241106/" # list with all the file directories
+InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250115/" # list with all the file directories
 queue = "workday" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Model_Graphsv240725_QOverPtRegression_241203/"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Model_Graphsv240725_QOverPtRegression_250115/"
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/TrainingModel/"
-ModelTypes = ['SAGE', 'MPNN']
-NormalizationTypes = ['DropLastTwoNodeFeatures', 'NodesAndEdgesAndOnlySpatial']
-InputGraphs = ["3neighbours_muonQOverPt/", "all_connections_muonQOverPt/"]
-GraphName = "vix_graph_6Nov"
+ModelTypes = ['GCN', 'SAGE', 'MPNN']
+NormalizationTypes = ['NodesAndEdgesAndOnlySpatial']
+InputGraphs = [""] #"3neighbours_muonQOverPt/", "all_connections_muonQOverPt/"]
+GraphName = "vix_graph_6Nov_all_muonQOverPt" 
+
 Epochs = 50
 ########   customization end   #########
 
@@ -56,14 +57,14 @@ for model in ModelTypes:
                 fout.write("cd "+str(path)+"\n")
                 fout.write("source pyenv/bin/activate\n")
                 fout.write("echo 'Saving Model in  %s' \n" %(OutputDir))
-                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --out_path %s --do_train --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 20 --graph_name %s --epochs %d\n" %(model, normalization, InputFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs))  
+                fout.write("python tools/training/TrainModelFromGraph.py --model_type %s --hidden_dim 32 --normalization %s --graph_path %s --out_model_path %s --do_train --save_tag %s --batch_size 1024 --learning_rate 0.001 --num_files 20 --graph_name %s --epochs %d\n" %(model, normalization, InputFolder+input_graph, OutputDir, SaveTag, GraphName, Epochs))  
                 fout.write("echo 'STOP---------------'\n")
                 fout.write("echo\n")
                 fout.write("echo\n")
             os.system("chmod 755 %s/exec/job_train_model_%02d.sh" %(WORKDIR, file_count))
 
 ###### create submit.sub file ####
-with open('submit.sub', 'w') as fout:
+with open('%s/submit.sub' %(WORKDIR), 'w') as fout:
     fout.write("executable              = $(filename)\n")
     fout.write("arguments               = $(ClusterId)$(ProcId)\n")
     fout.write("output                  = %s/batchlogs/$(ClusterId).$(ProcId).out\n" %(WORKDIR))
@@ -75,8 +76,10 @@ with open('submit.sub', 'w') as fout:
     fout.write("queue filename matching (%s/exec/job_*sh)\n" %(WORKDIR))
 
 ###### sends bjobs ######
-os.system("echo submit.sub")
+os.system("cd %s" %(WORKDIR)) 
+os.system("cat submit.sub")
 os.system("condor_submit submit.sub")
+os.system("cd -")
 
 print()
 print("your jobs:")

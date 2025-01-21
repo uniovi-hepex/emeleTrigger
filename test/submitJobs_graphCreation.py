@@ -6,9 +6,9 @@ print('START\n')
 ########   customization  area #########
 InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/" # list with all the file directories
 queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_241106/"
-Connectivity = ["all","3"]
-MuonVars = ["muonQPt","muonQOverPt"]
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250115/"
+Connectivity = ["all"]
+MuonVars = ["muonQOverPt"]
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/GraphCreation/"
 GraphFileName = "vix_graph_6Nov"
 ########   customization end   #########
@@ -65,7 +65,7 @@ for ifile in list_of_files:
     i+=1
 
 ###### create submit.sub file ####
-with open('submit.sub', 'w') as fout:
+with open('%s/submit.sub' %(WORKDIR), 'w') as fout:
     fout.write("executable              = $(filename)\n")
     fout.write("arguments               = $(ClusterId)$(ProcId)\n")
     fout.write("output                  = %s/batchlogs/$(ClusterId).$(ProcId).out\n" %(WORKDIR))
@@ -76,8 +76,10 @@ with open('submit.sub', 'w') as fout:
     fout.write("queue filename matching (%s/exec/job_*sh)\n" %(WORKDIR))
 
 ###### sends bjobs ######
-os.system("echo submit.sub")
+os.system("cd %s" %(WORKDIR))
+os.system("cat submit.sub")
 os.system("condor_submit submit.sub")
+os.system("cd -")
 
 print()
 print("your jobs:")
