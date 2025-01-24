@@ -158,7 +158,7 @@ def getEdgesFromLogicLayer(logicLayer,withRPC=True):
         return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer])
 
 class OMTFDataset(Dataset):
-    def __init__(self, root_dir, tree_name, muon_vars=None, stub_vars=None, transform=None, pre_transform=None, dataset=None, max_files=None, max_events=None):
+    def __init__(self, root_dir=None, tree_name=None, muon_vars=None, stub_vars=None, transform=None, pre_transform=None, dataset=None, max_files=None, max_events=None):
         """
         Args:
             root_dir (str): Directorio que contiene los archivos ROOT.
@@ -177,9 +177,10 @@ class OMTFDataset(Dataset):
             self.tree_name = tree_name
             self.muon_vars = muon_vars if muon_vars is not None else []
             self.stub_vars = stub_vars if stub_vars is not None else []
-            self.transform = transform
             self.pre_transform = pre_transform
             self.dataset = self.load_data_from_root()
+        
+        self.transform = transform
 
     def add_extra_vars_to_tree(self, tree):
         """
@@ -209,28 +210,24 @@ class OMTFDataset(Dataset):
                 file_path = os.path.join(self.root_dir, root_file)
                 with uproot.open(file_path) as file:
                     tree = file[self.tree_name]
-                    df = self.add_extra_vars_to_tree(tree)  # Convertir el árbol a DataFrame y agregar variables
+                    df = self.add_extra_vars_to_tree(tree) 
 
-                    for i in range(len(df)):
+                    for index, row in df.iterrows():
                         if self.max_events is not None and events_processed >= self.max_events:
                             break
-                        if events_processed % 100 == 0:
-                            print(f"Processed {events_processed} events")
 
-                        muon_sample = {var: df[var].iloc[i] for var in self.muon_vars}
-                        stub_sample = {var: df[var].iloc[i] for var in self.stub_vars}
+                        # Create nodes and edges
+                        stub_array = np.vstack([row[var] for var in self.stub_vars]).astype(np.float32).T
+                      
+                        x = torch.tensor(stub_array, dtype=torch.float)
+                        edge_index = self.create_edges(row['stubLayer'])
 
-                        # Convert the list of numpy.ndarrays to a single numpy.ndarray
-                        
-                        # Crear nodos y aristas
-                        x = torch.tensor([stub_sample[var] for var in self.stub_vars], dtype=torch.float).view(-1, len(self.stub_vars))
-                        edge_index = self.create_edges(stub_sample[self.stub_vars[1]])
-
-                        data = Data(x=x, edge_index=edge_index, y=torch.tensor([muon_sample[var] for var in self.muon_vars], dtype=torch.float))
+                        data = Data(x=x, edge_index=edge_index, y=torch.tensor([row[var] for var in self.muon_vars], dtype=torch.float))
                         if self.pre_transform is not None:
                             data = self.pre_transform(data)
                         data_list.append(data)
                         events_processed += 1
+
 
                 files_processed += 1
 
@@ -238,20 +235,16 @@ class OMTFDataset(Dataset):
 
     def create_edges(self, stubLayer):
         edge_index = []
-        for i in range(len(stubLayer)):
-            for j in range(i + 1, len(stubLayer)):
-                edge_index.append([i, j])
-                edge_index.append([j, i])
+        for stub1Id,stub1Layer in enumerate(stubLayer):
+            for stub2Id, stub2Layer in enumerate(stubLayer):
+                if stub1Layer == stub2Layer: continue
+                if stub2Layer in getEdgesFromLogicLayer(stub1Layer):
+                    edge_index.append([stub1Id, stub2Id])
+                    edge_index.append([stub2Id, stub1Id]) 
         return torch.tensor(edge_index, dtype=torch.long).t().contiguous()
 
     def len(self):
         return len(self.dataset)
-
-    def __getitem__(self, idx):
-        data = self.dataset[idx]
-        if self.transform is not None:
-            data = self.transform(data)
-        return data
     
     def __len__(self):
         return len(self.dataset)
@@ -262,14 +255,17 @@ class OMTFDataset(Dataset):
             data = self.transform(data)
         return data
 
+    def __getitem__(self, idx):
+        return self.get(idx)
+    
     def __repr__(self):
         return '({}({})'.format(self.__class__.__name__, len(self))
     
     def __str__(self):
         return '({}({})'.format(self.__class__.__name__, len(self))
     
-    def plot_example_graph(self, index=0, num_nodes=None):
-        data = self.get(index)
+    def plot_graph(self, idx, filename=None):
+        data = self.get(idx)
         
         G = nx.Graph()
         
@@ -279,19 +275,72 @@ class OMTFDataset(Dataset):
         edge_index = data.edge_index.numpy()
         for i in range(edge_index.shape[1]):
             G.add_edge(edge_index[0, i], edge_index[1, i], weight=data.edge_weight[i].item() if 'edge_weight' in data else 1.0)
-        
-        if num_nodes is not None:
-            nodes_to_keep = list(G.nodes)[:num_nodes]
-            G = G.subgraph(nodes_to_keep)
-        
+                
         pos = nx.spring_layout(G)
         nx.draw(G, pos, with_labels=True, node_color='skyblue', node_size=500, edge_color='gray')
         
-        edge_labels = nx.get_edge_attributes(G, 'weight')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+        #edge_labels = nx.get_edge_attributes(G, 'weight')
+        nx.draw_networkx_edge_labels(G, pos) # edge_labels=edge_labels)
         
-        plt.title(f'Grafo de ejemplo del índice {index} con {num_nodes if num_nodes is not None else "todos"} nodos')
+        plt.title(f'Grafo de ejemplo del índice {idx}')
         plt.show()
+        if filename is not None:
+            plt.savefig(filename)
+
+    def plot_example_graphs(self, filename=None):
+        """
+        Escanea el dataset y muestra grafos de ejemplo con diferentes números de nodos (de 4 a 10).
+        Etiqueta los nodos con la cuarta columna de data.x.
+        """
+        print('Drawing example graphs into ', filename)
+        # draw a figure with 6 subplots
+
+        fig, axs = plt.subplots(2, 4, figsize=(20, 10))
+        axs = axs.ravel()
+        ax = plt.gca()
+        ax.margins(0.08)
+    
+        num_nodes_list = range(3, 11)
+        found_graphs = {num_nodes: False for num_nodes in num_nodes_list}
+
+        for index, data in enumerate(self.dataset):
+            num_nodes = data.x.shape[0]
+            if num_nodes in num_nodes_list and not found_graphs[num_nodes]:
+                G = nx.Graph()
+                
+                # Añadir nodos con etiquetas de la cuarta columna de data.x
+                for i, node_feature in enumerate(data.x):
+                    G.add_node(i, label=node_feature[3].item())
+                
+                # Añadir aristas
+                edge_index = data.edge_index.numpy()
+                for i in range(edge_index.shape[1]):
+                    G.add_edge(edge_index[0, i], edge_index[1, i])
+                
+                # Dibujar el grafo
+                pos = nx.spring_layout(G)
+                labels = nx.get_node_attributes(G, 'label')
+                nx.draw(G, pos, labels=labels, node_color='skyblue', edge_color='gray', ax=axs[num_nodes-3])
+                
+                # Dibujar etiquetas de los pesos de las aristas
+                #edge_labels = nx.get_edge_attributes(G, 'weight')
+                nx.draw_networkx_edge_labels(G, pos, ax=axs[num_nodes-3])
+                
+                #plt.title(f'Grafo de ejemplo del índice {index} con {num_nodes} nodos')
+                #plt.show()
+                axs[num_nodes-3].set_title(f"{G}") 
+                axs[num_nodes-3].axis("off")
+
+                found_graphs[num_nodes] = True
+                if all(found_graphs.values()):
+                    break  # Salir del bucle si se han encontrado grafos para todos los números de nodos
+
+        plt.tight_layout()
+        plt.show()
+        if filename is not None:
+            plt.savefig(filename)
+        plt.close()  # Cerrar la gráfica automáticamente
+
 
     def save_dataset(self, file_path):
         torch.save(self.dataset, file_path)
