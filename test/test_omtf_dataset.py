@@ -15,10 +15,11 @@ if os.path.exists("/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_
     ROOTDIR = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/"
 else: 
     ROOTDIR = "../../data/Dumper_NTuples_v240725/"
-    
+
+print("Creating the dataset")
 mu_vars = ['muonQOverPt']
 st_vars =  ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType']
-dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, stub_vars=st_vars, max_events=10000,max_files=1)
+dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, stub_vars=st_vars, max_events=1000,max_files=1)
 
 print("Checking the dataset ")
 print("Length of the dataset: ", len(dataset))

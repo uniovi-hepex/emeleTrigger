@@ -4,6 +4,7 @@ import torch
 from torch_geometric.data import Dataset, Data
 import networkx as nx
 
+from torch_geometric.utils.convert import to_networkx
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -213,6 +214,8 @@ class OMTFDataset(Dataset):
                     df = self.add_extra_vars_to_tree(tree) 
 
                     for index, row in df.iterrows():
+                        if events_processed % 100 == 0:
+                            print(f"Processed {events_processed} events")
                         if self.max_events is not None and events_processed >= self.max_events:
                             break
 
@@ -264,30 +267,31 @@ class OMTFDataset(Dataset):
     def __str__(self):
         return '({}({})'.format(self.__class__.__name__, len(self))
     
-    def plot_graph(self, idx, filename=None):
+    def plot_graph(self, idx, filename=None, seed=42):
         data = self.get(idx)
         
-        G = nx.Graph()
+        G = to_networkx(data, to_undirected=True)
+        labels = {i: int(data.x[i, 3].item()) for i in range(data.x.shape[0])}
+
+        '''G = nx.Graph()
         
         for i, node_feature in enumerate(data.x):
             G.add_node(i, feature=node_feature.tolist())
         
         edge_index = data.edge_index.numpy()
         for i in range(edge_index.shape[1]):
-            G.add_edge(edge_index[0, i], edge_index[1, i], weight=data.edge_weight[i].item() if 'edge_weight' in data else 1.0)
-                
-        pos = nx.spring_layout(G)
-        nx.draw(G, pos, with_labels=True, node_color='skyblue', node_size=500, edge_color='gray')
-        
-        #edge_labels = nx.get_edge_attributes(G, 'weight')
-        nx.draw_networkx_edge_labels(G, pos) # edge_labels=edge_labels)
+            G.add_edge(edge_index[0, i], edge_index[1, i]) #, weight=data.edge_weight[i].item() if 'edge_weight' in data else 1.0)
+        '''
+        pos = nx.spring_layout(G,seed=seed)
+        nx.draw(G, pos, with_labels=True, labels=labels, node_color='skyblue', node_size=500)
+        #nx.draw_networkx_edge_labels(G, pos) # edge_labels=edge_labels)
         
         plt.title(f'Grafo de ejemplo del índice {idx}')
         plt.show()
         if filename is not None:
             plt.savefig(filename)
 
-    def plot_example_graphs(self, filename=None):
+    def plot_example_graphs(self, filename=None, seed=42):
         """
         Escanea el dataset y muestra grafos de ejemplo con diferentes números de nodos (de 4 a 10).
         Etiqueta los nodos con la cuarta columna de data.x.
@@ -306,11 +310,13 @@ class OMTFDataset(Dataset):
         for index, data in enumerate(self.dataset):
             num_nodes = data.x.shape[0]
             if num_nodes in num_nodes_list and not found_graphs[num_nodes]:
+                #G = to_networkx(data, to_undirected=True)
+
                 G = nx.Graph()
                 
                 # Añadir nodos con etiquetas de la cuarta columna de data.x
                 for i, node_feature in enumerate(data.x):
-                    G.add_node(i, label=node_feature[3].item())
+                    G.add_node(i, label=int(node_feature[3].item()))
                 
                 # Añadir aristas
                 edge_index = data.edge_index.numpy()
@@ -318,13 +324,13 @@ class OMTFDataset(Dataset):
                     G.add_edge(edge_index[0, i], edge_index[1, i])
                 
                 # Dibujar el grafo
-                pos = nx.spring_layout(G)
+                pos = nx.spring_layout(G,seed=seed)
                 labels = nx.get_node_attributes(G, 'label')
                 nx.draw(G, pos, labels=labels, node_color='skyblue', edge_color='gray', ax=axs[num_nodes-3])
                 
                 # Dibujar etiquetas de los pesos de las aristas
                 #edge_labels = nx.get_edge_attributes(G, 'weight')
-                nx.draw_networkx_edge_labels(G, pos, ax=axs[num_nodes-3])
+                #nx.draw_networkx_edge_labels(G, pos, ax=axs[num_nodes-3])
                 
                 #plt.title(f'Grafo de ejemplo del índice {index} con {num_nodes} nodos')
                 #plt.show()
