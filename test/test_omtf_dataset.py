@@ -9,17 +9,18 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.join(os.getcwd(), '..', 'tools'))
 
 
-from training.OMTFDataset import OMTFDataset
+from training.OMTFDataset import OMTFDataset,remove_empty_or_nan_graphs
 
 if os.path.exists("/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/"):
     ROOTDIR = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/"
 else: 
-    ROOTDIR = "../../data/Dumper_NTuples_v240725/"
+    #ROOTDIR = "../../data/Dumper_NTuples_v240725/"
+    ROOTDIR = "../../data/Dumper_NTuples_v240725/Dumper_l1omtf_001.root"
 
 print("Creating the dataset")
-mu_vars = ['muonQOverPt']
+mu_vars = ['muonQOverPt',"muonQPt"]
 st_vars =  ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType']
-dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, stub_vars=st_vars, max_events=1000,max_files=1)
+dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, stub_vars=st_vars, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs)
 
 print("Checking the dataset ")
 print("Length of the dataset: ", len(dataset))
@@ -49,7 +50,7 @@ print(dataset2[0].edge_index)
 print("Checking the loaded dataset2 is identical to the original one")
 for i in range(len(dataset)):
     assert torch.all(torch.eq(dataset[i].x, dataset2[i].x))
-    #assert torch.all(torch.eq(dataset[i].y, dataset2[i].y))
     assert torch.all(torch.eq(dataset[i].edge_index, dataset2[i].edge_index))
+    assert torch.all(torch.eq(dataset[i].y, dataset2[i].y))
 
 

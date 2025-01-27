@@ -158,6 +158,17 @@ def getEdgesFromLogicLayer(logicLayer,withRPC=True):
         if (logicLayer>=10): return []
         return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer])
 
+def remove_empty_or_nan_graphs(data):
+    # Verificar si el grafo está vacío
+    if data.x.size(0) == 0 or data.edge_index.size(1) == 0:
+        return None
+
+    # Verificar si hay valores nan en x, edge_attr o y
+    if torch.isnan(data.x).any() or (data.edge_attr is not None and torch.isnan(data.edge_attr).any()) or torch.isnan(data.y).any():
+        return None
+
+    return data
+
 class OMTFDataset(Dataset):
     def __init__(self, root_dir=None, tree_name=None, muon_vars=None, stub_vars=None, transform=None, pre_transform=None, dataset=None, max_files=None, max_events=None):
         """
@@ -204,38 +215,43 @@ class OMTFDataset(Dataset):
         files_processed = 0
         events_processed = 0
 
-        for root_file in os.listdir(self.root_dir):
+        # Verificar si root_dir es un directorio o un archivo
+        if os.path.isdir(self.root_dir):
+            root_files = [os.path.join(self.root_dir, f) for f in os.listdir(self.root_dir) if f.endswith(".root")]
+        elif os.path.isfile(self.root_dir) and self.root_dir.endswith(".root"):
+            root_files = [self.root_dir]
+        else:
+            raise ValueError(f"{self.root_dir} is not a valid directory or ROOT file")
+
+        for root_file in root_files:
             if self.max_files is not None and files_processed >= self.max_files:
                 break
-            if root_file.endswith(".root"):
-                file_path = os.path.join(self.root_dir, root_file)
-                with uproot.open(file_path) as file:
-                    tree = file[self.tree_name]
-                    df = self.add_extra_vars_to_tree(tree) 
 
-                    for index, row in df.iterrows():
-                        if events_processed % 100 == 0:
-                            print(f"Processed {events_processed} events")
-                        if self.max_events is not None and events_processed >= self.max_events:
-                            break
+            with uproot.open(root_file) as file:
+                tree = file[self.tree_name]
+                df = self.add_extra_vars_to_tree(tree)
 
-                        # Create nodes and edges
-                        stub_array = np.vstack([row[var] for var in self.stub_vars]).astype(np.float32).T
-                      
-                        x = torch.tensor(stub_array, dtype=torch.float)
-                        edge_index = self.create_edges(row['stubLayer'])
+                for index, row in df.iterrows():
+                    if events_processed % 100 == 0:
+                        print(f"Processed {events_processed} events")
+                    if self.max_events is not None and events_processed >= self.max_events:
+                        break
 
-                        data = Data(x=x, edge_index=edge_index, y=torch.tensor([row[var] for var in self.muon_vars], dtype=torch.float))
-                        if self.pre_transform is not None:
-                            data = self.pre_transform(data)
+                    # Create nodes and edges
+                    stub_array = np.vstack([row[var] for var in self.stub_vars]).astype(np.float32).T
+                    x = torch.tensor(stub_array, dtype=torch.float)
+                    edge_index = self.create_edges(row['stubLayer'])
+
+                    data = Data(x=x, edge_index=edge_index, y=torch.tensor([row[var] for var in self.muon_vars], dtype=torch.float))
+                    if self.pre_transform is not None:
+                        data = self.pre_transform(data)
+                    if data is not None:
                         data_list.append(data)
-                        events_processed += 1
+                    events_processed += 1
 
-
-                files_processed += 1
+            files_processed += 1
 
         return data_list
-
     def create_edges(self, stubLayer):
         edge_index = []
         for stub1Id,stub1Layer in enumerate(stubLayer):
@@ -290,6 +306,7 @@ class OMTFDataset(Dataset):
         plt.show()
         if filename is not None:
             plt.savefig(filename)
+        plt.close()
 
     def plot_example_graphs(self, filename=None, seed=42):
         """
@@ -364,7 +381,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Load ROOT files and create a PyTorch Geometric dataset")
     parser.add_argument('--root_dir', type=str, required=True, help='Directory containing the ROOT files')
-    parser.add_argument('--tree_name', type=str, required=True, help='Name of the tree inside the ROOT files')
+    parser.add_argument('--tree_name', type=str, default="simOmtfPhase2Digis/OMTFHitsTree", help='Name of the tree inside the ROOT files')
     parser.add_argument('--muon_vars', nargs='+', required=True, help='List of muon variables to extract')
     parser.add_argument('--stub_vars', nargs='+', required=True, help='List of stub variables to extract')
     parser.add_argument('--plot_example', action='store_true', help='Plot an example graph')
@@ -378,7 +395,8 @@ def main():
     if args.load_path:
         dataset = OMTFDataset.load_dataset(args.load_path)
     else:
-        dataset = OMTFDataset(root_dir=args.root_dir, tree_name=args.tree_name, muon_vars=args.muon_vars, stub_vars=args.stub_vars, max_files=args.max_files, max_events=args.max_events)
+        pre_transformation = remove_empty_or_nan_graphs
+        dataset = OMTFDataset(root_dir=args.root_dir, pre_transform=pre_transformation, tree_name=args.tree_name, muon_vars=args.muon_vars, stub_vars=args.stub_vars, max_files=args.max_files, max_events=args.max_events)
         if args.save_path:
             dataset.save_dataset(args.save_path)
 
