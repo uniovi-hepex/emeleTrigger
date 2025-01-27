@@ -1,0 +1,8 @@
+executable              = $(filename)
+arguments               = $(ClusterId)$(ProcId)
+output                  = /afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/GraphCreation//batchlogs/$(ClusterId).$(ProcId).out
+error                   = /afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/GraphCreation//batchlogs/$(ClusterId).$(ProcId).err
+log                     = /afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/GraphCreation//batchlogs/$(ClusterId).log
++JobFlavour = "microcentury"
+
+queue filename matching (/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/GraphCreation//exec/job_*sh)

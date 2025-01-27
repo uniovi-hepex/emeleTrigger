@@ -6,11 +6,11 @@ print('START\n')
 ########   customization  area #########
 InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/" # list with all the file directories
 queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250115/"
-Connectivity = ["all"]
-MuonVars = ["muonQOverPt"]
-WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/GraphCreation/"
-GraphFileName = "vix_graph_6Nov"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250127/"
+MuonVars = ["muonQOverPt", "muonQPt"]
+StubVars = ["stubEtaG", "stubPhiG", "stubR", "stubLayer", "stubType"]
+WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/DatasetCreation/"
+GraphFileName = "OmtfDataset_Jan27"
 ########   customization end   #########
 
 path = os.getcwd()
@@ -36,7 +36,6 @@ list_of_files = os.listdir(InputFolder)
 ## print info
 print("InputFolder: %s" %(InputFolder))
 print("OutputDir: %s" %(OutputDir))
-print("Connectivity: %s" %(Connectivity))
 print("Number of files: %d" %(len(list_of_files)))
 
 ##### loop for creating and sending jobs #####
@@ -51,13 +50,11 @@ for ifile in list_of_files:
         fout.write("echo 'WORKDIR ' ${PWD}\n")
         fout.write("cd "+str(path)+"\n")
         fout.write("source pyenv/bin/activate\n")
-        for connection in Connectivity:
-            fout.write("echo 'Running Connectivity: %s' \n" %(connection))
-            for muvars in MuonVars:
-                fout.write("echo 'Running With MuonVar: %s' \n" %(muvars))
-                output_graph_name = "%s/%s_%s_%s_%03d.pt" %(OutputDir, GraphFileName, connection, muvars, i)
-                fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
-                fout.write("python tools/training/GraphCreationModel.py --data_path %s:simOmtfPhase2Digis/OMTFHitsTree --muon_vars %s --graph_save_paths %s --model_connectivity %s\n" %(InputFolder+ifile, muvars, output_graph_name, connection))  
+        for muvars in MuonVars:
+            fout.write("echo 'Running With MuonVar: %s' \n" %(muvars))
+            output_graph_name = "%s/%s_%s_%03d.pt" %(OutputDir, GraphFileName, muvars, i)
+            fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
+            fout.write("python tools/training/OMTFDataset.py --root_dir %s --tree_name simOmtfPhase2Digis/OMTFHitsTree --muon_vars [%s] --stub_vars %s --save_path %s \n" %(InputFolder+ifile, muvars, StubVars, output_graph_name))  
         fout.write("echo 'STOP---------------'\n")
         fout.write("echo\n")
         fout.write("echo\n")

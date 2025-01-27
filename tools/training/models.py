@@ -30,7 +30,33 @@ class GATRegressor(torch.nn.Module):
         return x
     
     
+from torch_geometric.nn import GCNConv
+class GCNRegressor(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels=1):
+        super(GCNRegressor, self).__init__()
+        self.conv1 = GCNConv(in_channels, hidden_channels*4)
+        self.conv2 = GCNConv(hidden_channels*4, hidden_channels*2)
+        self.conv3 = GCNConv(hidden_channels*2, hidden_channels*2)
+        self.conv4 = GCNConv(hidden_channels*2, hidden_channels*2)
 
+        self.lin1 = torch.nn.Linear(hidden_channels*2, hidden_channels*2)
+        self.lin2 = torch.nn.Linear(hidden_channels*2, hidden_channels)
+        self.lin3 = torch.nn.Linear(hidden_channels, hidden_channels)
+        self.lin4 = torch.nn.Linear(hidden_channels, out_channels)
+
+    def forward(self, data):
+        x, edge_index, edge_weight, batch = data.x.float(), data.edge_index, data.edge_weight, data.batch
+
+        x = F.relu(self.conv1(x, edge_index, edge_weight))
+        x = F.relu(self.conv2(x, edge_index, edge_weight))
+        x = F.relu(self.conv3(x, edge_index, edge_weight))
+        x = F.relu(self.conv4(x, edge_index, edge_weight))
+        x = global_max_pool(x, data.batch)
+        x = F.relu(self.lin1(x))
+        x = F.relu(self.lin2(x))
+        x = F.relu(self.lin3(x))
+        x = self.lin4(x).squeeze(1)
+        return x
 
 from torch_geometric.nn import SAGEConv
 class GraphSAGEModel(torch.nn.Module):
