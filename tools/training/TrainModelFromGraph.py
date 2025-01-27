@@ -24,6 +24,7 @@ class TrainModelFromGraph:
         parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
         parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for training')
         parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs for training')
+        parser.add_argument('--earlystop', type=int, default=3, help='Number of epochs before closing the training if there is no improvement in the loss')
         parser.add_argument('--model_path', type=str, default=None, help='Path to the saved model for evaluation')
         parser.add_argument('--do_validation', action='store_true', help='Evaluate the model')
         parser.add_argument('--model_type', type=str, default='SAGE', help='Model to use for training')
@@ -42,6 +43,7 @@ class TrainModelFromGraph:
         self.batch_size = kwargs.get('batch_size', 1024)
         self.learning_rate = kwargs.get('learning_rate', 0.001)
         self.epochs = kwargs.get('epochs', 100)
+        self.earlystop = kwargs.get('earlystop', 3)
         self.model_path = kwargs.get('model_path', None)
         self.do_validation = kwargs.get('evaluate', False)
         self.do_train = kwargs.get('do_train', False)
@@ -240,15 +242,32 @@ class TrainModelFromGraph:
         print(f"Saving results in {self.out_model_path}")
         if not os.path.exists(self.out_model_path):
             os.makedirs(self.out_model_path)
+
+        window = self.earlystop
+        best_loss = float('inf')
+        best_epoch = int(0)
+        counter = int(0)
         
         print("Start training...")
         for epoch in range(self.epochs):
             train_loss = self.train_model(self.train_loader)
             test_loss = self.test_model(self.test_loader)
-            if (epoch + 1) % 10 == 0:
+            torch.save({'train_loss': train_loss, 'test_loss': test_loss}, f"{self.out_model_path}/loss_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pt")
+
+            if test_loss < best_loss: #found better loss
+                best_loss = test_loss
+                best_epoch = epoch
+                counter = 0
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
-                torch.save(self.model.state_dict(), f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pth")
-                torch.save({'train_loss': train_loss, 'test_loss': test_loss}, f"{self.out_model_path}/loss_{self.model_type}_{self.hidden_dim}dim_{epoch+1}epochs_{self.save_tag}.pt")
+                torch.save(self.model.state_dict(), f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{self.epochs}epochs_{self.save_tag}.pth")
+            else:
+                counter += 1 #increment counter
+
+            #Stop training if more than X epochs have passed without improvements to the test loss
+            if counter == window:
+                print(f'Early stop reached at epoch {best_epoch + 1}, training closing at epoch {epoch + 1}\n Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
+                break
+        
 
     def set_model_path(self, path):
         self.model_path = path
@@ -276,6 +295,7 @@ def main():
     parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for training')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for training')
+    parser.add_argument('--earlystop', type=int, default=3, help='Number of epochs before closing the training if there is no improvement in the loss')
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--do_train', action='store_true', help='Train the model')
