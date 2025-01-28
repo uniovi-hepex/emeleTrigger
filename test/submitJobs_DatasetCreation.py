@@ -6,7 +6,7 @@ print('START\n')
 ########   customization  area #########
 InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/" # list with all the file directories
 queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250127/"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/GraphsDataset_v240725_250128/"
 MuonVars = ["muonQOverPt", "muonQPt"]
 StubVars = ["stubEtaG", "stubPhiG", "stubR", "stubLayer", "stubType"]
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/DatasetCreation/"
@@ -36,6 +36,7 @@ list_of_files = os.listdir(InputFolder)
 ## print info
 print("InputFolder: %s" %(InputFolder))
 print("OutputDir: %s" %(OutputDir))
+print("WorkDir: %s" %(WORKDIR))
 print("Number of files: %d" %(len(list_of_files)))
 
 ##### loop for creating and sending jobs #####
@@ -74,9 +75,8 @@ with open('%s/submit.sub' %(WORKDIR), 'w') as fout:
 
 ###### sends bjobs ######
 os.system("cd %s" %(WORKDIR))
-os.system("cat submit.sub")
-os.system("condor_submit submit.sub")
-os.system("cd -")
+os.system("cat %s/submit.sub" %(WORKDIR))
+os.system("cd %s; condor_submit submit.sub; cd -" %(WORKDIR))
 
 print()
 print("your jobs:")

@@ -190,7 +190,8 @@ class TrainModelFromGraph:
         # Load data
         self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
-        
+            
+
     def initialize_model(self):
         num_node_features = 3
         hidden_dim = self.hidden_dim
@@ -321,7 +322,6 @@ def main():
         from validation import plot_prediction_results, evaluate_model
         regression,prediction = evaluate_model(trainer.model, trainer.test_loader, trainer.device)
         plot_prediction_results(regression, prediction, output_dir=args.output_dir,model=trainer.model_type, label=trainer.save_tag)
-
 
 if __name__ == "__main__":
     main()
