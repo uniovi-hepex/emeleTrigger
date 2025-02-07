@@ -77,8 +77,8 @@ with open('%s/submit.sub' %(WORKDIR), 'w') as fout:
 
 ###### sends bjobs ######
 os.system("cd %s" %(WORKDIR)) 
-os.system("cat submit.sub")
-os.system("condor_submit submit.sub")
+os.system("cat %s/submit.sub" %(WORKDIR))
+os.system("condor_submit %s/submit.sub" %(WORKDIR))
 os.system("cd -")
 
 print()
