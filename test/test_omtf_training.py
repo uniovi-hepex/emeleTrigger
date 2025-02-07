@@ -3,7 +3,7 @@ import os, sys
 import matplotlib.pyplot as plt
 
 ## Create the dataset with OMTF dataset
-sys.path.append(os.path.join(os.getcwd(), '..', 'tools', "training"))
+sys.path.append(os.path.join(os.getcwd(), '.', 'tools', "training"))
 
 from TrainModelFromGraph import TrainModelFromGraph
 from validation import plot_graph_feature_histograms, plot_prediction_results, evaluate_model
