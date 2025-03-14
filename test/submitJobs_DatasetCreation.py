@@ -4,32 +4,33 @@ import os,sys
 print('START\n')
 ########   YOU ONLY NEED TO FILL THE AREA BELOW   #########
 ########   customization  area #########
-InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/" # list with all the file directories
+InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250312/SingleMu_FlatPt1to1000_FullEta_Apr04_125X/" # list with all the file directories
 queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250127/"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250312_250314/SingleMu_FlatPt1to1000/"
 MuonVars = ["muonQOverPt", "muonQPt"]
 StubVars = ["stubEtaG", "stubPhiG", "stubR", "stubLayer", "stubType"]
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/DatasetCreation/"
-GraphFileName = "OmtfDataset_Jan27"
+GraphFileName = "OmtfDataset_Mar14"
 ########   customization end   #########
 
 path = os.getcwd()
 print('do not worry about folder creation:\n')
-os.system("rm -rf %s" %(WORKDIR))
-os.system("mkdir %s" %(WORKDIR))
-os.system("mkdir %s/exec" %(WORKDIR))
-os.system("mkdir %s/batchlogs" %(WORKDIR))
+if os.path.exists(WORKDIR):
+    os.system(f"rm -rf {WORKDIR}")
+os.makedirs(WORKDIR)
+os.makedirs(os.path.join(WORKDIR, "exec"))
+os.makedirs(os.path.join(WORKDIR, "batchlogs"))
 
 if not os.path.exists(OutputDir):
-    print("OutputDir %s does not exist" %(OutputDir))
-    os.system("mkdir %s" %(OutputDir))
-else :
+    print(f"OutputDir {OutputDir} does not exist")
+    os.makedirs(OutputDir)
+else:
     print("Warning: OutputDir already exists. It will be overwritten\n")
-    print("OutputDir: %s" %(OutputDir))
+    print(f"OutputDir: {OutputDir}")
 
 ## create list of files
 if not os.path.exists(InputFolder):
-    print("InputFolder does not exist")
+    print("InputFolder %s does not exist" %(InputFolder))
     sys.exit()
 list_of_files = os.listdir(InputFolder)
 
@@ -49,7 +50,7 @@ for ifile in list_of_files:
         fout.write("echo 'START---------------'\n")
         fout.write("echo 'WORKDIR ' ${PWD}\n")
         fout.write("cd "+str(path)+"\n")
-        fout.write("source pyenv/bin/activate\n")
+        fout.write("source %s/pyenv/bin/activate\n" %(path))
         for muvars in MuonVars:
             fout.write("echo 'Running With MuonVar: %s' \n" %(muvars))
             output_graph_name = "%s/%s_%s_%03d.pt" %(OutputDir, GraphFileName, muvars, i)
@@ -73,14 +74,18 @@ with open('%s/submit.sub' %(WORKDIR), 'w') as fout:
     fout.write("queue filename matching (%s/exec/job_*sh)\n" %(WORKDIR))
 
 ###### sends bjobs ######
-os.system("cd %s" %(WORKDIR))
-os.system("cat submit.sub")
-os.system("condor_submit submit.sub")
-os.system("cd -")
+print()
+print("to submit all jobs do: ")
+print("....................................................................")
+print("cd %s" %(WORKDIR))
+print("cat submit.sub")
+print("condor_submit submit.sub")
+print("cd -")
 
 print()
-print("your jobs:")
-os.system("condor_q")
+print("### CHECK your jobs:")
+print("condor_q")
 print()
+print("....................................................................")
 print('END')
 print()
