@@ -6,13 +6,12 @@ import os, sys
 import matplotlib.pyplot as plt
 
 ## Create the dataset with OMTF dataset
-sys.path.append(os.path.join(os.getcwd(), '..', 'tools'))
+sys.path.append(os.path.join(os.getcwd(), '..', 'tools','tools/training'))
 
+from OMTFDataset import OMTFDataset,remove_empty_or_nan_graphs
 
-from training.OMTFDataset import OMTFDataset,remove_empty_or_nan_graphs
-
-if os.path.exists("/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/"):
-    ROOTDIR = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v240725/"
+if os.path.exists("/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250312/SingleMu_FlatPt1to1000_FullEta_Apr04_125X/"):
+    ROOTDIR = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250312/SingleMu_FlatPt1to1000_FullEta_Apr04_125X/"
 else: 
     #ROOTDIR = "../../data/Dumper_NTuples_v240725/"
     ROOTDIR = "../../data/Dumper_NTuples_v240725/Dumper_l1omtf_001.root"
