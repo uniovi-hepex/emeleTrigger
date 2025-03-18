@@ -200,10 +200,10 @@ class OMTFDataset(Dataset):
         """
         df = tree.arrays(library="pd")  # Convertir el árbol a un DataFrame de pandas
 
-        df['stubR'] = df.apply(lambda x: get_stub_r(x['stubType'], x['stubEta'], x['stubLayer'], x['stubQuality']), axis=1)
-        df['stubPhi'] = df['stubPhi'] + df['stubPhiB']
+        #df['stubR'] = df.apply(lambda x: get_stub_r(x['stubType'], x['stubEta'], x['stubLayer'], x['stubQuality']), axis=1)
+        df['stubPhiM'] = df['stubPhi'] + df['stubPhiB']
         df['stubEtaG'] = df['stubEta'] * HW_ETA_TO_ETA_FACTOR
-        df['stubPhiG'] = df.apply(lambda x: get_global_phi(x['stubPhi'], x['omtfProcessor']), axis=1)
+        df['stubPhiG'] = df.apply(lambda x: get_global_phi(x['stubPhiM'], x['omtfProcessor']), axis=1)
         df['muonPropEta'] = df['muonPropEta'].abs()
         df['muonQPt'] = df['muonCharge'] * df['muonPt']
         df['muonQOverPt'] = df['muonCharge'] / df['muonPt']
