@@ -8,7 +8,7 @@ cd CMSSW_14_2_1_PhaseII/src/
 cmsenv
 git cms-init
 git fetch my-cmssw
-git cms-merge-topic -u kbunkow/from-CMSSW_14_2_0_pre2_KB_v1
+git cms-merge-topic -u kbunkow:from-CMSSW_14_2_0_pre2_KB_v1
 
 git cms-addpkg L1Trigger/Phase2L1GMT
 git cms-addpkg DataFormats/L1TMuonPhase2
