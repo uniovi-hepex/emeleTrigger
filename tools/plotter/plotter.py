@@ -22,7 +22,9 @@ class plotter(object):
         self.filterPlots()
         if not os.path.exists(self.options.pdir):
             os.makedirs(self.options.pdir)
+
             for dataset in self.datasets:
+                print("Creating directory %s"%(self.options.pdir + "/" + dataset))
                 os.makedirs(self.options.pdir + "/" + dataset)
                 os.makedirs(self.options.pdir + "/" + dataset + "/Observables")
             os.system("git clone https://github.com/musella/php-plots.git " + self.options.pdir)
@@ -40,9 +42,9 @@ class plotter(object):
 
     def filterPlots(self):
         self.plots = {}
+        wildcard = self.options.plotThis.strip().lower()
         for key in plots:
-            print(self.options.plotThis)
-            if re.match(self.options.plotThis, key):
+            if wildcard in ("*", "all") or re.match(self.options.plotThis, key):
                 if "executer" in plots[key].keys() and not(type(self).__name__ == plots[key]["executer"]):
                     print("[WARNING] Plot %s being skipped by executer==%s configuration option"%(key, plots[key]["executer"]))
                     continue
