@@ -63,8 +63,19 @@ class plotter(object):
             
             # Check if dataset["samples"] is a list, if it is a list, and read all the files in the list
             if isinstance(self.datasets[dataset]["samples"], list):
-                print("Reading files from list")
-                branches = uproot.concatenate(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"], library='pd')
+
+
+                file_and_tree = "%s:%s" % (self.datasets[dataset]["samples"][0], self.datasets[dataset]["treename"])
+                branches = uproot.open(file_and_tree)
+                branches = branches.arrays(library='pd')
+
+                ## I NEED TO USE THIS: 
+##                >>> for array in uproot.iterate("files*.root:tree", ["x", "y"], step_size=100):
+##                ...     # each of the following have 100 entries
+##                ...     array["x"], array["y"]
+
+                #print("Reading files from list")
+                #branches = uproot.concatenate(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"], library='pd')
             else: 
                 print("Reading files from string")
                 branches = uproot.open("%s:%s" %(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"]))  
