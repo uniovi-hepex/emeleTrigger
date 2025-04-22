@@ -27,7 +27,7 @@ for var in tree_vars:
         'logY'       : False,
         'logX'       : False,
         'grid'       : True,
-        'savename'   : f'[PDIR]/[DATASET]/Observables/{var}',
+        'savename'   : f'[PDIR]/[DATASET]/{var}',
         'executer'   : 'plotter',
         'type'       : '1D'
     }

@@ -20,14 +20,17 @@ class plotter(object):
         self.options = options
         self.filterDatasets()
         self.filterPlots()
-        if not os.path.exists(self.options.pdir):
-            os.makedirs(self.options.pdir)
+        os.makedirs(self.options.pdir,exist_ok=True)
+        import shutil
+        index_file = os.path.expanduser("~folguera/public/utils/index.php")
 
-            for dataset in self.datasets:
-                print("Creating directory %s"%(self.options.pdir + "/" + dataset))
-                os.makedirs(self.options.pdir + "/" + dataset)
-                os.makedirs(self.options.pdir + "/" + dataset + "/Observables")
-            os.system("git clone https://github.com/musella/php-plots.git " + self.options.pdir)
+        for dataset in self.datasets:
+            print("Creating directory %s"%(self.options.pdir + "/" + dataset))
+            dataset_dir = os.path.join(self.options.pdir, dataset)
+            os.makedirs(dataset_dir, exist_ok=True)
+            shutil.copy(index_file, os.path.join(dataset_dir, "index.php"))
+
+        shutil.copy(index_file, os.path.join(self.options.pdir, "index.php"))
 
     def filterDatasets(self):
         self.datasets = {}
@@ -54,8 +57,19 @@ class plotter(object):
         self.df = {}
         for dataset in self.datasets:
             if self.verbose: print("Loaded dataset %s"%dataset)
-            branches = uproot.open("%s:%s" %(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"]))  
-            branches=branches.arrays(library='pd')
+            # Check if dataset["samples"] is a list or a string, if it is a list, keep only the first element
+#            if isinstance(self.datasets[dataset]["samples"], list):
+#                self.datasets[dataset]["samples"] = self.datasets[dataset]["samples"][0]       
+            
+            # Check if dataset["samples"] is a list, if it is a list, and read all the files in the list
+            if isinstance(self.datasets[dataset]["samples"], list):
+                print("Reading files from list")
+                branches = uproot.concatenate(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"], library='pd')
+            else: 
+                print("Reading files from string")
+                branches = uproot.open("%s:%s" %(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"]))  
+                branches=branches.arrays(library='pd')
+
             print('Downsampling...')
             self.df[dataset]=branches.sample(frac=self.options.fraction)
             print('Downsampling done')
@@ -100,7 +114,6 @@ class plotter(object):
             
     def plot1DHisto(self,series,plot,dataset):
         fig, ax = plt.subplots()
-        print(type(series))
         series.plot(kind='hist', xlabel=plot["xlabel"], ylabel=plot["ylabel"], bins=plot["bins"], range=plot["xrange"], 
                         label=dataset["label"], color=dataset["color"], logy=plot["logY"], logx=plot["logX"],histtype='step', 
                         grid=plot["grid"],fill=False)
@@ -117,7 +130,7 @@ try:
             print('[WARNING] Cannot plot %s with matplotlib'%plot["xlabel"])
 '''
         fig.tight_layout()
-        plt.show(block=False)
+        #plt.show(block=False)
         plt.savefig(plot["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset["name"]))
         plt.close()
         
@@ -125,14 +138,11 @@ try:
         fig, ax = plt.subplots()
         bins=plot["bins"]
         range=plot["range"]
-        print(xarry)
-        print("y")
-        print(yarray)
         plt.hist2d(xarry,yarray,bins,range)
         plt.colorbar()
         ax.set_xlabel(plot["xlabel"])
         ax.set_ylabel(plot["ylabel"])
-        plt.show(block=False)
+        #plt.show(block=False)
         plt.savefig(plot["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset["name"]))
         plt.close()
 
@@ -183,7 +193,7 @@ if __name__ == "__main__":
     parser.add_argument("--pdir"    , dest="pdir"      , type=str      , default="./output/"    , help="Where to put the plots into")
     parser.add_argument("-v","--verbose"  , dest="verbose"    , action="store_true", default=True         , help="If activated, print verbose output")
     parser.add_argument("-n","--normalize"  , dest="normalize"    , action="store_true", default=False         , help="Normalize histograms to unity")
-    parser.add_argument("-f","--fraction"   , dest="fraction"     , type=float      , default=0.5    , help="Donwnscale the dataset by this factor")
+    parser.add_argument("-f","--fraction"   , dest="fraction"     , type=float      , default=0.1    , help="Donwnscale the dataset by this factor")
 
     options = parser.parse_args()
 
