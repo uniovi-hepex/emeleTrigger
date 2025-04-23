@@ -56,7 +56,6 @@ class plotter(object):
     def loadFiles(self):
         self.df = {}
         for dataset in self.datasets:
-            if self.verbose: print("Loaded dataset %s"%dataset)
             # Check if dataset["samples"] is a list or a string, if it is a list, keep only the first element
 #            if isinstance(self.datasets[dataset]["samples"], list):
 #                self.datasets[dataset]["samples"] = self.datasets[dataset]["samples"][0]       
@@ -64,26 +63,52 @@ class plotter(object):
             # Check if dataset["samples"] is a list, if it is a list, and read all the files in the list
             if isinstance(self.datasets[dataset]["samples"], list):
 
-
-                file_and_tree = "%s:%s" % (self.datasets[dataset]["samples"][0], self.datasets[dataset]["treename"])
+                '''file_and_tree = "%s:%s" % (self.datasets[dataset]["samples"][0], self.datasets[dataset]["treename"])
                 branches = uproot.open(file_and_tree)
-                branches = branches.arrays(library='pd')
+                branches = branches.arrays(library='pd')'''
 
-                ## I NEED TO USE THIS: 
-##                >>> for array in uproot.iterate("files*.root:tree", ["x", "y"], step_size=100):
-##                ...     # each of the following have 100 entries
-##                ...     array["x"], array["y"]
+                files_list = self.datasets[dataset]["samples"]
+                treename = self.datasets[dataset]["treename"]
+                
+                # Usamos iterate y acumulamos los arrays en una lista
 
-                #print("Reading files from list")
-                #branches = uproot.concatenate(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"], library='pd')
+                branches_list = []
+                for file in files_list:
+                    if self.verbose: print("   > reading file %s"%file)
+                    file_and_tree = "%s:%s" % (file, treename)
+                    try:
+                        one_branch = uproot.open(file_and_tree)
+                        one_branch = one_branch.arrays(library='pd')
+                        # Downsampling...
+                        one_branch = one_branch.sample(frac=self.options.fraction)
+                        branches_list.append(one_branch)
+                    except uproot.KeyInFileError as e:
+                        print("[WARNING] Key not found in file %s: %s" % (file_and_tree, e))
+                        continue
+
+                # Concatenamos los DataFrames obtenidos, si se cargó alguno
+                if branches_list:
+                    if self.verbose: print("   > concatenating %d branches"%len(branches_list))
+                    branches = pd.concat(branches_list)
+                else:
+                    print("[ERROR] No branches loaded for dataset %s" % dataset)
+                    branches = pd.DataFrame()
+
             else: 
-                print("Reading files from string")
-                branches = uproot.open("%s:%s" %(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"]))  
-                branches=branches.arrays(library='pd')
+                if self.verbose: print("Reading files from %s"%self.datasets[dataset]["samples"])
+                try:
+                    file_and_tree = "%s:%s" % (self.datasets[dataset]["samples"], self.datasets[dataset]["treename"])
+                    branches = uproot.open(file_and_tree)
+                    branches = branches.arrays(library='pd')
+                except uproot.KeyInFileError as e:
+                    print("[WARNING] Key not found in file %s: %s" % (file_and_tree, e))
+                    branches = pd.DataFrame()
+            
+            if self.verbose: print("Loaded dataset %s"%dataset)
 
-            print('Downsampling...')
+            if self.verbose: print('Downsampling (twice in case of lists)...')
             self.df[dataset]=branches.sample(frac=self.options.fraction)
-            print('Downsampling done')
+            if self.verbose: print('Downsampling done')
     
     def loadVariableFromDataset_tonumpy(self, plot, dataset,index):
         variable = self.plots[plot]["variable"][index]
