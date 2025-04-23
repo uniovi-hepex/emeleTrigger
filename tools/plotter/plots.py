@@ -1,3 +1,38 @@
+tree_vars = [
+    'eventNum', 'muonEvent', 'muonPt', 'muonEta', 'muonPhi', 'muonPropEta',
+    'muonPropPhi', 'muonCharge', 'muonDxy', 'muonRho', 'omtfPt', 'omtfUPt',
+    'omtfEta', 'omtfPhi', 'omtfCharge', 'omtfHwEta', 'omtfProcessor',
+    'omtfScore', 'omtfQuality', 'omtfRefLayer', 'omtfRefHitNum',
+    'omtfFiredLayers', 'stubNo', 'stubLayer', 'stubQuality',
+    'stubZ', 'stubValid', 'stubEta', 'stubPhiDist', 'stubPhi',
+    'stubIsRefLayer', 'stubTiming', 'stubDetId', 'stubBx', 'stubPhiB',
+    'stubR', 'stubDeltaR', 'stubType', 'inputStubNo', 'inputStubLayer',
+    'inputStubQuality', 'inputStubZ', 'inputStubProc', 'inputStubEta',
+    'inputStubPhi', 'inputStubTiming',
+    'inputStubDetId', 'inputStubBx', 'inputStubPhiB', 'inputStubR',
+    'inputStubType', 'inputStubIsMatched', 'deltaEta', 'deltaPhi'
+]
+
+# Crear configuración de plots para cada variable con configuraciones básicas
+plots = {}
+for var in tree_vars:
+    plots[var] = {
+        'variable'   : var,
+        'bins'       : 100,                   # Puedes ajustar o implementar lógica para diferentes binning
+        'extra cuts' : 'True',                # O personalizar según la variable
+        'xlabel'     : var,
+        'ylabel'     : 'Yields',
+        'xrange'     : None,                  # Puedes definir rangos por defecto o dejar None
+        'ExtraSpam'  : "",
+        'logY'       : False,
+        'logX'       : False,
+        'grid'       : True,
+        'savename'   : f'[PDIR]/[DATASET]/{var}',
+        'executer'   : 'plotter',
+        'type'       : '1D'
+    }
+
+'''
 plots = {
     #---------------------------#####################---------------------------#
     ############################---------------------############################
@@ -799,3 +834,4 @@ plots = {
     },
     
 }
+'''

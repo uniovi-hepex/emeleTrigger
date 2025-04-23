@@ -229,6 +229,8 @@ class OMTFDataset(Dataset):
 
             with uproot.open(root_file) as file:
                 tree = file[self.tree_name]
+                # drop the event if it has no stubs
+                
                 df = self.add_extra_vars_to_tree(tree)
 
                 for index, row in df.iterrows():

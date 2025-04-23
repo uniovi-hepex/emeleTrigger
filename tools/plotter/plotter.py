@@ -20,12 +20,17 @@ class plotter(object):
         self.options = options
         self.filterDatasets()
         self.filterPlots()
-        if not os.path.exists(self.options.pdir):
-            os.makedirs(self.options.pdir)
-            for dataset in self.datasets:
-                os.makedirs(self.options.pdir + "/" + dataset)
-                os.makedirs(self.options.pdir + "/" + dataset + "/Observables")
-            os.system("git clone https://github.com/musella/php-plots.git " + self.options.pdir)
+        os.makedirs(self.options.pdir,exist_ok=True)
+        import shutil
+        index_file = os.path.expanduser("~folguera/public/utils/index.php")
+
+        for dataset in self.datasets:
+            print("Creating directory %s"%(self.options.pdir + "/" + dataset))
+            dataset_dir = os.path.join(self.options.pdir, dataset)
+            os.makedirs(dataset_dir, exist_ok=True)
+            shutil.copy(index_file, os.path.join(dataset_dir, "index.php"))
+
+        shutil.copy(index_file, os.path.join(self.options.pdir, "index.php"))
 
     def filterDatasets(self):
         self.datasets = {}
@@ -40,9 +45,9 @@ class plotter(object):
 
     def filterPlots(self):
         self.plots = {}
+        wildcard = self.options.plotThis.strip().lower()
         for key in plots:
-            print(self.options.plotThis)
-            if re.match(self.options.plotThis, key):
+            if wildcard in ("*", "all") or re.match(self.options.plotThis, key):
                 if "executer" in plots[key].keys() and not(type(self).__name__ == plots[key]["executer"]):
                     print("[WARNING] Plot %s being skipped by executer==%s configuration option"%(key, plots[key]["executer"]))
                     continue
@@ -51,12 +56,59 @@ class plotter(object):
     def loadFiles(self):
         self.df = {}
         for dataset in self.datasets:
+            # Check if dataset["samples"] is a list or a string, if it is a list, keep only the first element
+#            if isinstance(self.datasets[dataset]["samples"], list):
+#                self.datasets[dataset]["samples"] = self.datasets[dataset]["samples"][0]       
+            
+            # Check if dataset["samples"] is a list, if it is a list, and read all the files in the list
+            if isinstance(self.datasets[dataset]["samples"], list):
+
+                '''file_and_tree = "%s:%s" % (self.datasets[dataset]["samples"][0], self.datasets[dataset]["treename"])
+                branches = uproot.open(file_and_tree)
+                branches = branches.arrays(library='pd')'''
+
+                files_list = self.datasets[dataset]["samples"]
+                treename = self.datasets[dataset]["treename"]
+                
+                # Usamos iterate y acumulamos los arrays en una lista
+
+                branches_list = []
+                for file in files_list:
+                    if self.verbose: print("   > reading file %s"%file)
+                    file_and_tree = "%s:%s" % (file, treename)
+                    try:
+                        one_branch = uproot.open(file_and_tree)
+                        one_branch = one_branch.arrays(library='pd')
+                        # Downsampling...
+                        one_branch = one_branch.sample(frac=self.options.fraction)
+                        branches_list.append(one_branch)
+                    except uproot.KeyInFileError as e:
+                        print("[WARNING] Key not found in file %s: %s" % (file_and_tree, e))
+                        continue
+
+                # Concatenamos los DataFrames obtenidos, si se cargó alguno
+                if branches_list:
+                    if self.verbose: print("   > concatenating %d branches"%len(branches_list))
+                    branches = pd.concat(branches_list)
+                else:
+                    print("[ERROR] No branches loaded for dataset %s" % dataset)
+                    branches = pd.DataFrame()
+
+            else: 
+                if self.verbose: print("Reading files from %s"%self.datasets[dataset]["samples"])
+                try:
+                    file_and_tree = "%s:%s" % (self.datasets[dataset]["samples"], self.datasets[dataset]["treename"])
+                    branches = uproot.open(file_and_tree)
+                    branches = branches.arrays(library='pd')
+                except uproot.KeyInFileError as e:
+                    print("[WARNING] Key not found in file %s: %s" % (file_and_tree, e))
+                    branches = pd.DataFrame()
+            
             if self.verbose: print("Loaded dataset %s"%dataset)
-            branches = uproot.open("%s:%s" %(self.datasets[dataset]["samples"], self.datasets[dataset]["treename"]))  
-            branches=branches.arrays(library='pd')
-            print('Downsampling...')
+
+            if self.verbose: print('Downsampling (twice in case of lists)...')
             self.df[dataset]=branches.sample(frac=self.options.fraction)
-            print('Downsampling done')
+            if self.verbose: print('Downsampling done')
     
     def loadVariableFromDataset_tonumpy(self, plot, dataset,index):
         variable = self.plots[plot]["variable"][index]
@@ -98,7 +150,6 @@ class plotter(object):
             
     def plot1DHisto(self,series,plot,dataset):
         fig, ax = plt.subplots()
-        print(type(series))
         series.plot(kind='hist', xlabel=plot["xlabel"], ylabel=plot["ylabel"], bins=plot["bins"], range=plot["xrange"], 
                         label=dataset["label"], color=dataset["color"], logy=plot["logY"], logx=plot["logX"],histtype='step', 
                         grid=plot["grid"],fill=False)
@@ -115,7 +166,7 @@ try:
             print('[WARNING] Cannot plot %s with matplotlib'%plot["xlabel"])
 '''
         fig.tight_layout()
-        plt.show(block=False)
+        #plt.show(block=False)
         plt.savefig(plot["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset["name"]))
         plt.close()
         
@@ -123,14 +174,11 @@ try:
         fig, ax = plt.subplots()
         bins=plot["bins"]
         range=plot["range"]
-        print(xarry)
-        print("y")
-        print(yarray)
         plt.hist2d(xarry,yarray,bins,range)
         plt.colorbar()
         ax.set_xlabel(plot["xlabel"])
         ax.set_ylabel(plot["ylabel"])
-        plt.show(block=False)
+        #plt.show(block=False)
         plt.savefig(plot["savename"].replace("[PDIR]",self.options.pdir).replace("[DATASET]",dataset["name"]))
         plt.close()
 
@@ -181,7 +229,7 @@ if __name__ == "__main__":
     parser.add_argument("--pdir"    , dest="pdir"      , type=str      , default="./output/"    , help="Where to put the plots into")
     parser.add_argument("-v","--verbose"  , dest="verbose"    , action="store_true", default=True         , help="If activated, print verbose output")
     parser.add_argument("-n","--normalize"  , dest="normalize"    , action="store_true", default=False         , help="Normalize histograms to unity")
-    parser.add_argument("-f","--fraction"   , dest="fraction"     , type=float      , default=0.5    , help="Donwnscale the dataset by this factor")
+    parser.add_argument("-f","--fraction"   , dest="fraction"     , type=float      , default=0.1    , help="Donwnscale the dataset by this factor")
 
     options = parser.parse_args()
 
