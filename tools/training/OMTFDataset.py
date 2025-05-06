@@ -173,45 +173,68 @@ def remove_empty_or_nan_graphs(data):
     return data
 
 class OMTFDataset(Dataset):
-    def __init__(self, root_dir=None, tree_name=None, muon_vars=None, stub_vars=None, transform=None, pre_transform=None, dataset=None, max_files=None, max_events=None):
+    def __init__(self, **kwargs):
         """
-        Args:
+        Los parámetros se pueden pasar como keyword arguments:
             root_dir (str): Directorio que contiene los archivos ROOT.
-            tree_name (str): Nombre del árbol dentro de los archivos ROOT.
-            muon_vars (list of str, optional): Lista de variables de muones a extraer.
-            stub_vars (list of str, optional): Lista de variables de stubs a extraer.
-            transform (callable, optional): Una función/transformación que toma un objeto Data y lo devuelve transformado.
-            pre_transform (callable, optional): Una función/transformación que se aplica antes de guardar los datos.
+            tree_name (str): Nombre del árbol (default: "simOmtfPhase2Digis/OMTFHitsTree").
+            muon_vars (list): Variables de muones a extraer.
+            stub_vars (list): Variables de stubs a extraer.
+            input_vars (list): Variables de input stubs a extraer.
+            max_files (int): Número máximo de archivos a procesar.
+            max_events (int): Número máximo de eventos a procesar.
+            debug (bool): Modo debug.
+            pre_transform (callable): Función de pre-transformación.
+            transform (callable): Función de transformación (opcional).
         """
-        self.max_files = max_files if max_files is not None else None
-        self.max_events = max_events
-        if dataset is not None:
-            self.dataset = dataset
+        self.root_dir   = kwargs.get("root_dir")
+        self.tree_name  = kwargs.get("tree_name", "simOmtfPhase2Digis/OMTFHitsTree")
+        self.muon_vars  = kwargs.get("muon_vars", [])
+        self.stub_vars  = kwargs.get("stub_vars", [])
+        self.input_vars = kwargs.get("input_vars", [])
+        self.max_files  = kwargs.get("max_files")
+        self.max_events = kwargs.get("max_events")
+        self.debug      = kwargs.get("debug", False)
+        self.pre_transform = kwargs.get("pre_transform")
+        self.transform  = kwargs.get("transform")
+
+        if "dataset" in kwargs and kwargs["dataset"] is not None:
+            self.dataset = kwargs["dataset"]
         else:
-            self.root_dir = root_dir
-            self.tree_name = tree_name
-            self.muon_vars = muon_vars if muon_vars is not None else []
-            self.stub_vars = stub_vars if stub_vars is not None else []
-            self.pre_transform = pre_transform
             self.dataset = self.load_data_from_root()
-        
-        self.transform = transform
+
 
     def add_extra_vars_to_tree(self, tree):
         """
         Add some extra variables....
         """
         df = tree.arrays(library="pd")  # Convertir el árbol a un DataFrame de pandas
-        df = df[df.stubNo > 0]
-        if 'stubR' not in df.columns:
-            df['stubR'] = df.apply(lambda x: get_stub_r(x['stubType'], x['stubEta'], x['stubLayer'], x['stubQuality']), axis=1)
-        df['stubPhi'] = df['stubPhi'] + df['stubPhiB']
-        df['stubEtaG'] = df['stubEta'] * HW_ETA_TO_ETA_FACTOR
-        df = df[df.columns.drop(list(df.filter(regex='inputStub')))]
-        df['stubPhiG'] = df.apply(lambda x: get_global_phi(x['stubPhi'], x['omtfProcessor']), axis=1)
-        df['muonPropEta'] = df['muonPropEta'].abs()
-        df['muonQPt'] = df['muonCharge'] * df['muonPt']
-        df['muonQOverPt'] = df['muonCharge'] / df['muonPt']
+        if self.stub_vars and len(self.stub_vars) > 0:
+            if self.debug: print("Stub variables: ", self.stub_vars)
+            df = df[df['stubNo'] > 0]
+            if 'stubR' not in df.columns:
+                df['stubR'] = df.apply(lambda x: get_stub_r(x['stubType'], x['stubEta'], x['stubLayer'], x['stubQuality']), axis=1)
+            df['stubPhi'] = df['stubPhi'] + df['stubPhiB']
+            df['stubEtaG'] = df['stubEta'] * HW_ETA_TO_ETA_FACTOR
+            #df = df[df.columns.drop(list(df.filter(regex='inputStub')))]
+            df['stubPhiG'] = df.apply(lambda x: get_global_phi(x['stubPhi'], x['omtfProcessor']), axis=1)
+
+        # InputStub variables:
+        if self.input_vars and len(self.input_vars) > 0:
+            if self.debug: print("Input stub variables: ", self.input_vars)
+            ## check if inputStubNo is greater than 0
+            df = df[df['inputStubNo'] > 0]
+            df['inputStubR'] = df.apply(lambda x: get_stub_r(x['inputStubType'], x['inputStubEta'], x['inputStubLayer'], x['inputStubQuality']), axis=1)
+            df['inputStubPhi'] = df['inputStubPhi'] + df['inputStubPhiB']
+            df['inputStubEtaG'] = df['inputStubEta'] * HW_ETA_TO_ETA_FACTOR
+            df['inputStubR'] = df.apply(lambda x: get_stub_r(x['inputStubType'], x['inputStubEta'], x['inputStubLayer'], x['inputStubQuality']), axis=1)
+            df['inputStubPhiG'] = df.apply(lambda x: get_global_phi(x['inputStubPhi'], x['omtfProcessor']), axis=1)
+
+        ## Muon variables
+        if self.muon_vars is not None:
+            df['muonPropEta'] = df['muonPropEta'].abs()
+            df['muonQPt'] = df['muonCharge'] * df['muonPt']
+            df['muonQOverPt'] = df['muonCharge'] / df['muonPt']
 
         return df
     
@@ -428,19 +451,27 @@ def main():
     parser.add_argument('--tree_name', type=str, default="simOmtfPhase2Digis/OMTFHitsTree", help='Name of the tree inside the ROOT files')
     parser.add_argument('--muon_vars', nargs='+', type=str, required=True, help='List of muon variables to extract')
     parser.add_argument('--stub_vars', nargs='+', type=str, required=True, help='List of stub variables to extract')
+    parser.add_argument('--input_vars', nargs='+', type=str, help='List of input stub variables to extract')
     parser.add_argument('--plot_example', action='store_true', help='Plot an example graph')
     parser.add_argument('--save_path', type=str, help='Path to save the dataset')
     parser.add_argument('--load_path', type=str, help='Path to load the dataset')
     parser.add_argument('--max_files', type=int, help='Maximum number of files to process')
     parser.add_argument('--max_events', type=int, help='Maximum number of events to process')
-
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
     if args.load_path:
         dataset = OMTFDataset.load_dataset(args.load_path)
     else:
         pre_transformation = remove_empty_or_nan_graphs
-        dataset = OMTFDataset(root_dir=args.root_dir, pre_transform=pre_transformation, tree_name=args.tree_name, muon_vars=args.muon_vars, stub_vars=args.stub_vars, max_files=args.max_files, max_events=args.max_events)
+#        dataset = OMTFDataset(root_dir=args.root_dir, pre_transform=pre_transformation, tree_name=args.tree_name, muon_vars=args.muon_vars, stub_vars=args.stub_vars, max_files=args.max_files, max_events=args.max_events)
+
+        # Solo pasamos las claves que requiere el constructor de OMTFDataset
+        allowed_keys = ["root_dir", "tree_name", "muon_vars", "stub_vars", "input_vars", "max_files", "max_events", "debug"]
+        opts = {k: v for k, v in vars(args).items() if k in allowed_keys}
+
+        dataset = OMTFDataset(pre_transform=pre_transformation, **opts)
+
         if args.save_path:
             dataset.save_dataset(args.save_path)
 
