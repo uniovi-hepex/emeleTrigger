@@ -136,11 +136,11 @@ def getEdgesFromLogicLayer(logicLayer,withRPC=True):
     }
     LOGIC_LAYERS_CONNECTION_MAP_WITH_RPC = {
             0:  [2,4,6,7,8,9,10,11,12,13,14,15,16,17], 
-            1:  [2,4,6,7,8,9,10,11,12,13,14,15,16,17], 
+            #1:  [2,4,6,7,8,9,10,11,12,13,14,15,16,17], 
             2:  [4,6,7,10,11,12,13,14,15,16],       #MB2: [MB3, ME1/3]
-            3:  [4,6,7,10,11,12,13,14,15,16],       #MB2: [MB3, ME1/3]
+            #3:  [4,6,7,10,11,12,13,14,15,16],       #MB2: [MB3, ME1/3]
             4:  [6,10,11,12,13,14,15],         #MB3: [ME1/3]
-            5:  [6,10,11,12,13,14,15],         #MB3: [ME1/3]
+            #5:  [6,10,11,12,13,14,15],         #MB3: [ME1/3]
             6:  [7,8,10,11,12,13,14,15,16,17],         #ME1/3: [ME2/2]
             7:  [8,9,10,11,15,16,17],         #ME2/2: [ME3/2]
             8:  [9,10,11,15,16,17],        #ME3/2: [RE3/3]
@@ -246,16 +246,24 @@ class OMTFDataset(Dataset):
                     layers=row['stubLayer']
                     stub_phi=row['stubPhi']
                     stub_phiB=row['stubPhiB']
+                    
                     for layerL in [1,3,5]:
                         try:
-                            layers.index(layerL)
+                            row['stubLayer'].index(layerL)
                         except ValueError:
                             continue
                         else:
-                            index2=layers.index(layerL)                            
-                            index1=index2-1
-                            print(f'Entry {index}: Layers {layerL-1} - {layerL}   Phi{layerL}: {stub_phi[index1]}  Phi{layerL+1}: {stub_phi[index2]}   PhiB{layerL}: {stub_phiB[index1]}  PhiB{layerL+1}: {stub_phiB[index2]}   DeltaPhi {stub_phi[index1]-stub_phi[index2]}     DeltaPhiB {stub_phiB[index1]-stub_phiB[index2]}')
-                            
+                            indexL=row['stubLayer'].index(layerL)
+                            layersLen=len(row['stubLayer'])
+                            row['stubNo']=row['stubNo']-1
+                            for column in df.columns.values.tolist():
+                                if "stub" in column and column!='stubNo':
+                                    if len(row[column])==layersLen:
+                                        row[column].pop(indexL)                            
+                            #index2=layers.index(layerL)                            
+                            #index1=index2-1
+                            #print(f'Entry {index}: Layers {layerL-1} - {layerL}   Phi{layerL}: {stub_phi[index1]}  Phi{layerL+1}: {stub_phi[index2]}   PhiB{layerL}: {stub_phiB[index1]}  PhiB{layerL+1}: {stub_phiB[index2]}   DeltaPhi {stub_phi[index1]-stub_phi[index2]}     DeltaPhiB {stub_phiB[index1]-stub_phiB[index2]}')
+                         
                     # Create nodes and edges
                     stub_array = np.vstack([row[var] for var in self.stub_vars]).astype(np.float32).T
                     x = torch.tensor(stub_array, dtype=torch.float)
@@ -285,15 +293,6 @@ class OMTFDataset(Dataset):
         stubEta = row['stubEta']
         edge_index = []
         edge_attr = []
-        if xor(0 in stubLayer, 1 in stubLayer):
-            print("01 pair")
-        if xor(2 in stubLayer, 3 in stubLayer):
-            print("23 pair")
-        if xor(4 in stubLayer, 5 in stubLayer):
-            print("45 pair")
-        for extra in [1,3,5]:
-            if extra in stubLayer:
-                stubLayer.remove(extra)
         for stub1Id,stub1Layer in enumerate(stubLayer):
             for stub2Id, stub2Layer in enumerate(stubLayer):
                 #print(f'stubt1Id:{stub1Id}   stub1Layer:{stub1Layer}    stubt2Id:{stub2Id}   stub2Layer:{stub2Layer}')
@@ -303,8 +302,6 @@ class OMTFDataset(Dataset):
                     deta = self.getDeltaEta(stubEta[stub1Id],stubEta[stub2Id])
                     edge_index.append([stub1Id, stub2Id])
                     edge_attr.append([dphi, deta])
-                    edge_index.append([stub2Id, stub1Id]) 
-                    edge_attr.append([-dphi, -deta])
         edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         edge_attr = torch.tensor(edge_attr, dtype=torch.float)
         return edge_index, edge_attr
