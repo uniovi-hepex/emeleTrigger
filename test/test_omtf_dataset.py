@@ -20,7 +20,7 @@ mu_vars = ['muonQOverPt',"muonQPt"]
 
 st_vars =  ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType']
 in_vars =  ['inputStubEtaG', 'inputStubPhiG','inputStubR', 'inputStubLayer','inputStubType']
-dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, input_vars=in_vars, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs, debug=True)
+dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, st_vars=st_vars, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs, debug=True)
 
 print("Checking the dataset ")
 print("Length of the dataset: ", len(dataset))

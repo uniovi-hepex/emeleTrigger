@@ -42,6 +42,20 @@ def get_global_phi(phi, processor):
     else:
         return (processor * 192 + phi + 600) % NUM_PHI_BINS * p1phiLSB
 
+def safe_get_global_phi(row):
+    phi = row['inputStubPhi']
+    proc = row['omtfProcessor']
+    # Si no hay datos o es una lista/array vacío, devuelve np.nan
+    if phi is None:
+        return np.nan
+    if isinstance(phi, (list, np.ndarray)):
+        if len(phi) == 0:
+            return np.nan
+        # Si hay datos, puedes elegir: devolver el primer valor procesado o realizar otra agregación.
+        # Aquí devolvemos el primer valor:
+        return get_global_phi(phi[0], proc)
+    return get_global_phi(phi, proc)
+
 
 def get_stub_r(stubTypes, stubEta, stubLayer, stubQuality):
     rs = []
@@ -203,12 +217,19 @@ class OMTFDataset(Dataset):
         else:
             self.dataset = self.load_data_from_root()
 
+    def filter_empty_rows(self, df):
 
-    def add_extra_vars_to_tree(self, tree):
+        if self.debug: print("Filtering empty rows")
+        df = df[(df['muonPropEta'] != 0) & (df['muonPropPhi'] != 0) & (df['muonEvent'] == 0)].copy()
+        if self.debug: print("Number of events after filtering (muonPropPhi & muonPropEta): ", len(df))
+        if self.debug: print(df.head())
+
+        return df
+    
+    def add_extra_vars_to_tree(self, df):
         """
         Add some extra variables....
         """
-        df = tree.arrays(library="pd")  # Convertir el árbol a un DataFrame de pandas
         if self.stub_vars and len(self.stub_vars) > 0:
             if self.debug: print("Stub variables: ", self.stub_vars)
             df = df[df['stubNo'] > 0]
@@ -216,20 +237,21 @@ class OMTFDataset(Dataset):
                 df['stubR'] = df.apply(lambda x: get_stub_r(x['stubType'], x['stubEta'], x['stubLayer'], x['stubQuality']), axis=1)
             df['stubPhi'] = df['stubPhi'] + df['stubPhiB']
             df['stubEtaG'] = df['stubEta'] * HW_ETA_TO_ETA_FACTOR
-            #df = df[df.columns.drop(list(df.filter(regex='inputStub')))]
+            df = df[df.columns.drop(list(df.filter(regex='inputStub')))]
             df['stubPhiG'] = df.apply(lambda x: get_global_phi(x['stubPhi'], x['omtfProcessor']), axis=1)
 
         # InputStub variables:
         if self.input_vars and len(self.input_vars) > 0:
             if self.debug: print("Input stub variables: ", self.input_vars)
             ## check if inputStubNo is greater than 0
-            df = df[df['inputStubNo'] > 0]
-            df['inputStubR'] = df.apply(lambda x: get_stub_r(x['inputStubType'], x['inputStubEta'], x['inputStubLayer'], x['inputStubQuality']), axis=1)
-            df['inputStubPhi'] = df['inputStubPhi'] + df['inputStubPhiB']
-            df['inputStubEtaG'] = df['inputStubEta'] * HW_ETA_TO_ETA_FACTOR
-            df['inputStubR'] = df.apply(lambda x: get_stub_r(x['inputStubType'], x['inputStubEta'], x['inputStubLayer'], x['inputStubQuality']), axis=1)
-            df['inputStubPhiG'] = df.apply(lambda x: get_global_phi(x['inputStubPhi'], x['omtfProcessor']), axis=1)
+            df = df.loc[df['inputStubNo'] > 0].copy()
+            df.loc[:, 'inputStubEtaG'] = df['inputStubEta'] * HW_ETA_TO_ETA_FACTOR           
 
+            #if 'inputStubR' not in df.columns:
+            #    df['inputStubR'] = df.apply(lambda x: get_stub_r(x['inputStubType'], x['inputStubEta'], x['inputStubLayer'], x['inputStubQuality']), axis=1)
+            df['inputStubPhi'] = df['inputStubPhi'] + df['inputStubPhiB']
+            #df.loc[:,'inputStubPhiG'] = df.apply(lambda x: get_global_phi(x['inputStubPhi'], x['omtfProcessor']), axis=1)
+            df['inputStubPhiG'] = df.apply(lambda x: get_global_phi(x['inputStubPhi'], x['omtfProcessor']), axis=1)
         ## Muon variables
         if self.muon_vars is not None:
             df['muonPropEta'] = df['muonPropEta'].abs()
@@ -257,9 +279,24 @@ class OMTFDataset(Dataset):
 
             with uproot.open(root_file) as file:
                 tree = file[self.tree_name]
-                # drop the event if it has no stubs
+
+                # filter-out empty events and events with NaN values
+                if self.debug: print("Loading tree from file: ", root_file)
+                if self.debug: print("Tree name: ", self.tree_name)
+                if self.debug: print("Number of events in tree: ", tree.num_entries)
+                if self.debug: print("Number of branches in tree: ", len(tree.keys()))
+                if self.debug: print("Branches: ", tree.keys())
+                if self.debug: print("Branches: ", tree.arrays(library="pd").head())
+                if self.debug: print("Branches: ", tree.arrays(library="pd").tail())
+
+                df = tree.arrays(library="pd")  # Convertir el árbol a un DataFrame de pandas
+                if self.debug: print("Number of events in tree: ", len(df)) 
+
+                df = self.filter_empty_rows(df)
+                if self.debug: print("Number of events after filtering: ", len(df))
                 
-                df = self.add_extra_vars_to_tree(tree)
+                df = self.add_extra_vars_to_tree(df)
+                if self.debug: print("Number of events after adding extra variables: ", len(df))
 
                 for index, row in df.iterrows():
                     if events_processed % 100 == 0:
