@@ -10,15 +10,15 @@ sys.path.append(os.path.join(os.getcwd(), '..', 'tools/training'))
 
 from OMTFDataset import OMTFDataset,remove_empty_or_nan_graphs
 
-if os.path.exists("/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250326/MuGun_FullEta_FlatPt1to1000/"):
-    ROOTDIR = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250326/MuGun_FullEta_FlatPt1to1000/"
+if os.path.exists("/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250409/MuGun_FullEta_FlatPt1to1000/"):
+    ROOTDIR = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250409/MuGun_FullEta_FlatPt1to1000/"
 else: 
-    ROOTDIR = "../../data/Dumper_MuGun_FullEta_v250326_001.root"
+    ROOTDIR = "../../data/MuGun_Displaced_v250409_Dumper_l1omtf_001.root"
 
 print("Creating the dataset")
 mu_vars = ['muonQOverPt',"muonQPt"]
 st_vars =  ['stubEtaG', 'stubPhiG','stubR', 'stubLayer','stubType']
-st_vars =  ['inputStubEtaG', 'inputStubPhiG','inputStubR', 'inputStubLayer','inputStubType']
+#st_vars =  ['inputStubEtaG', 'inputStubPhiG','inputStubR', 'inputStubLayer','inputStubType']
 dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, stub_vars=st_vars, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs)
 
 print("Checking the dataset ")
