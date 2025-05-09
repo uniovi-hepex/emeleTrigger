@@ -2,6 +2,7 @@ import os
 import uproot
 import torch
 from torch_geometric.data import Dataset, Data
+import awkward as ak
 import networkx as nx
 from operator import xor
 
@@ -10,8 +11,8 @@ from torch_geometric.utils.convert import to_networkx
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.training.converter import get_stub_r, get_global_phi, HW_ETA_TO_ETA_FACTOR, getEdgesFromLogicLayer, remove_empty_or_nan_graphs
-from tools.training.converter import getEdgesFromLogicLayer, HW_ETA_TO_ETA_FACTOR, get_global_phi, get_stub_r
+from converter import get_stub_r, get_global_phi, HW_ETA_TO_ETA_FACTOR, getEdgesFromLogicLayer, remove_empty_or_nan_graphs
+from converter import getEdgesFromLogicLayer, HW_ETA_TO_ETA_FACTOR, get_global_phi, get_stub_r
 ''' Auxliary functions and variables move to some auxiliary file '''
 
 class OMTFDataset(Dataset):
@@ -45,23 +46,24 @@ class OMTFDataset(Dataset):
         else:
             self.dataset = self.load_data_from_root()
 
-    def add_extra_vars_to_tree(self, tree):
+    def add_extra_vars_to_tree(self, arr):
         """
         Add some extra variables....
         """
-        df = tree.arrays(library="pd")  # Convertir el árbol a un DataFrame de pandas
-        df = df[df.stubNo > 0]
-        if 'stubR' not in df.columns:
-            df['stubR'] = df.apply(lambda x: get_stub_r(x['stubType'], x['stubEta'], x['stubLayer'], x['stubQuality']), axis=1)
-        df['stubPhi'] = df['stubPhi'] + df['stubPhiB']
-        df['stubEtaG'] = df['stubEta'] * HW_ETA_TO_ETA_FACTOR
-        df = df[df.columns.drop(list(df.filter(regex='inputStub')))]
-        df['stubPhiG'] = df.apply(lambda x: get_global_phi(x['stubPhi'], x['omtfProcessor']), axis=1)
-        df['muonPropEta'] = df['muonPropEta'].abs()
-        df['muonQPt'] = df['muonCharge'] * df['muonPt']
-        df['muonQOverPt'] = df['muonCharge'] / df['muonPt']
+        if not hasattr(arr, "stubR"):
+            arr['stubR'] = get_stub_r(arr['stubType'], arr['stubEta'], arr['stubLayer'], arr['stubQuality'])
+        arr['stubEtaG'] = arr['stubEta'] * HW_ETA_TO_ETA_FACTOR
+        arr['stubPhiG'] = get_global_phi(arr['stubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
 
-        return df
+        if not hasattr(arr, "inputStubR"):
+            arr['inputStubR'] = get_stub_r(arr['inputStubType'], arr['inputStubEta'], arr['inputStubLayer'], arr['inputStubQuality'])
+        arr['inputStubEtaG'] = arr['inputStubEta'] * HW_ETA_TO_ETA_FACTOR
+        arr['inputStubPhiG'] = get_global_phi(arr['inputStubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
+
+        arr['muonQPt'] = arr['muonCharge'] * arr['muonPt']
+        arr['muonQOverPt'] = arr['muonCharge'] / arr['muonPt']
+
+        return arr
     
     def load_data_from_root(self):
         data_list = []
@@ -79,52 +81,40 @@ class OMTFDataset(Dataset):
         for root_file in root_files:
             if self.max_files is not None and files_processed >= self.max_files:
                 break
+            
+            file = uproot.open(root_file)
+            tree = file[self.tree_name]
+            arr = tree.arrays(library="ak")
+            
+            arr = self.add_extra_vars_to_tree(arr)
 
-            with uproot.open(root_file) as file:
-                tree = file[self.tree_name]
+            for event in ak.to_list(arr):
+                if events_processed % 1000 == 0:
+                    print(f"Processed {events_processed} events")
+                if self.max_events is not None and events_processed >= self.max_events:
+                    break
+
                 # drop the event if it has no stubs
+                if (event['stubNo']) == 0 or (event['inputStubNo']) == 0:
+                    continue
+
+                # Now create nodes and edges: 
+                node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32).T
+
+                ## CREATE THE EDGES:
+                edge_index, edge_attr = self.create_edges(event)
                 
-                df = self.add_extra_vars_to_tree(tree)
+                data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=torch.tensor([event[var] for var in self.muon_vars], dtype=torch.float))
 
-                for index, row in df.iterrows():
-                    if events_processed % 100 == 0:
-                        print(f"Processed {events_processed} events")
-                    if self.max_events is not None and events_processed >= self.max_events:
-                        break
-                    layers=row['stubLayer']
-                    stub_phi=row['stubPhi']
-                    stub_phiB=row['stubPhiB']
-                    
-                    for layerL in [1,3,5]:
-                        try:
-                            row['stubLayer'].index(layerL)
-                        except ValueError:
-                            continue
-                        else:
-                            indexL=row['stubLayer'].index(layerL)
-                            layersLen=len(row['stubLayer'])
-                            row['stubNo']=row['stubNo']-1
-                            for column in df.columns.values.tolist():
-                                if "stub" in column and column!='stubNo':
-                                    if len(row[column])==layersLen:
-                                        row[column].pop(indexL)                            
-                            #index2=layers.index(layerL)                            
-                            #index1=index2-1
-                            #print(f'Entry {index}: Layers {layerL-1} - {layerL}   Phi{layerL}: {stub_phi[index1]}  Phi{layerL+1}: {stub_phi[index2]}   PhiB{layerL}: {stub_phiB[index1]}  PhiB{layerL+1}: {stub_phiB[index2]}   DeltaPhi {stub_phi[index1]-stub_phi[index2]}     DeltaPhiB {stub_phiB[index1]-stub_phiB[index2]}')
-                         
-                    # Create nodes and edges
-                    stub_array = np.vstack([row[var] for var in self.stub_vars]).astype(np.float32).T
-                    x = torch.tensor(stub_array, dtype=torch.float)
-                    edge_index, edge_attr = self.create_edges(row)
-
-                    data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=torch.tensor([row[var] for var in self.muon_vars], dtype=torch.float))
-                    if self.pre_transform is not None:
-                        data = self.pre_transform(data)
-                    if data is not None:
-                        data_list.append(data)
-                    events_processed += 1
+                if self.pre_transform is not None:
+                    # Apply pre-transformations to the data
+                    data = self.pre_transform(data)
+                if data is not None:
+                    data_list.append(data)
+                events_processed += 1
 
             files_processed += 1
+        
         return data_list
 
     def getDeltaPhi(self,phi1,phi2):
