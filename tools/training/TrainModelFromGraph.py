@@ -44,7 +44,7 @@ class TrainModelFromGraph:
         self.learning_rate = kwargs.get('learning_rate', 0.001)
         self.epochs = kwargs.get('epochs', 100)
         self.earlystop = kwargs.get('earlystop', 3)
-        self.model_path = kwargs.get('model_path', 'model_%s/%s.pth' %(self.out_model_path,self.save_tag))
+        self.model_path = kwargs.get('model_path', '%s/model_%s.pth' %(self.out_model_path,self.save_tag))
         self.do_validation = kwargs.get('evaluate', False)
         self.do_train = kwargs.get('do_train', False)
         self.hidden_dim = kwargs.get('hidden_dim', 32)
