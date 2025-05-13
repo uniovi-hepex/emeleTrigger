@@ -12,10 +12,10 @@ from models import GraphSAGEModel
 model_type = "SAGE"
 hidden_dim = 32
 normalization = "NodesAndEdgesAndOnlySpatial"
-graph_path = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250115/"
+graph_path = "/eos/user/a/acardini/INTREPID/Graphs_v250502/MuGun_Displaced/"
 output_dir = "./test_out_model/"
 
-trainer = TrainModelFromGraph(model_type=model_type, hidden_dim=hidden_dim, normalization=normalization, graph_path=graph_path, out_model_path="./test_out_model/", save_tag="SAGE_NodesAndEdgesAndOnlySpatial_Bsize64_lr5e-4_250115_allConnections", batch_size=1024, learning_rate=0.001, num_files=20, graph_name="vix_graph_6Nov_all_muonQOverPt", epochs=50)
+trainer = TrainModelFromGraph(model_type=model_type, hidden_dim=hidden_dim, normalization=normalization, graph_path=graph_path, out_model_path="./test_out_model/", save_tag="SAGE_NodesAndEdgesAndOnlySpatial_Bsize64_lr5e-4_250115_allConnections", batch_size=1024, learning_rate=0.001, num_files=20, graph_name="OmtfDataset_Apr23_muonQPt", epochs=50)
 
 trainer.load_data()
 trainer.initialize_model()

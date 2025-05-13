@@ -23,7 +23,6 @@ class OMTFDataset(Dataset):
             tree_name (str): Nombre del árbol (default: "simOmtfPhase2Digis/OMTFHitsTree").
             muon_vars (list): Variables de muones a extraer.
             stub_vars (list): Variables de stubs a extraer.
-            input_vars (list): Variables de input stubs a extraer.
             max_files (int): Número máximo de archivos a procesar.
             max_events (int): Número máximo de eventos a procesar.
             debug (bool): Modo debug.
@@ -34,7 +33,7 @@ class OMTFDataset(Dataset):
         self.tree_name  = kwargs.get("tree_name", "simOmtfPhase2Digis/OMTFHitsTree")
         self.muon_vars  = kwargs.get("muon_vars", [])
         self.stub_vars  = kwargs.get("stub_vars", [])
-        self.input_vars = kwargs.get("input_vars", [])
+        self.task       = kwargs.get("task", "regression")
         self.max_files  = kwargs.get("max_files")
         self.max_events = kwargs.get("max_events")
         self.debug      = kwargs.get("debug", False)
@@ -59,10 +58,10 @@ class OMTFDataset(Dataset):
             arr['inputStubR'] = get_stub_r(arr['inputStubType'], arr['inputStubEta'], arr['inputStubLayer'], arr['inputStubQuality'])
         arr['inputStubEtaG'] = arr['inputStubEta'] * HW_ETA_TO_ETA_FACTOR
         arr['inputStubPhiG'] = get_global_phi(arr['inputStubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
-
+        arr['inputStubIsMatchedv2'] = isDuplicatedNodeOnSameLayer(arr['inputStubDetId'], arr['inputStubLayer'], arr['inputStubPhi'], arr['inputStubEta'], arr, stubName='stub')
         arr['muonQPt'] = arr['muonCharge'] * arr['muonPt']
         arr['muonQOverPt'] = arr['muonCharge'] / arr['muonPt']
-
+        
         return arr
     
     def load_data_from_root(self):
@@ -101,10 +100,15 @@ class OMTFDataset(Dataset):
                 # Now create nodes and edges: 
                 node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32).T
 
+                if self.task == 'classification':
+                    target_features = torch.tensor([event[var] for var in self.muon_vars], dtype=torch.long).T
+                elif self.task == 'regression':
+                    target_features = torch.tensor([event[var] for var in self.muon_vars], dtype=torch.float32).T
+
                 ## CREATE THE EDGES:
-                edge_index, edge_attr = self.create_edges(event)
-                
-                data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=torch.tensor([event[var] for var in self.muon_vars], dtype=torch.float))
+                edge_index, edge_attr = self.create_edges(event)               
+
+                data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=target_features, dtype=torch.float)
 
                 if self.pre_transform is not None:
                     # Apply pre-transformations to the data
@@ -125,10 +129,30 @@ class OMTFDataset(Dataset):
     def getDeltaEta(self,eta1,eta2):
         return eta1-eta2
     
-    def create_edges(self, row):
-        stubLayer = row['stubLayer']
-        stubPhi = row['stubPhi']
-        stubEta = row['stubEta']
+    def isMatchedToStubCollection(self, detId, layer, phi, eta, ismatched, row, stubName='stub', ):
+        stubphi = row['%sPhi' % stubName]
+        stubeta = row['%sEta' % stubName]
+        stublayer = row['%sLayer' % stubName]
+        stubdetId = row['%sDetId' % stubName]
+
+        for idx, lay in enumerate(stublayer):
+            if ismatched == 0: 
+                return False
+            if lay != layer: continue
+            if stubdetId[idx] != detId:  continue 
+
+            # we are now on the same layer and detId, check if there is another stub with different phi and eta: 
+            if stubphi[idx] == phi and stubeta[idx] == eta:
+                return True
+            else: 
+                return False
+            
+        return False    
+
+    def create_edges(self, row, stubName='stub'):
+        stubLayer = row['%sLayer' % stubName]
+        stubPhi = row['%sPhi' % stubName]
+        stubEta = row['%sEta' % stubName]
         edge_index = []
         edge_attr = []
         for stub1Id,stub1Layer in enumerate(stubLayer):
@@ -266,7 +290,7 @@ def main():
     parser.add_argument('--tree_name', type=str, default="simOmtfPhase2Digis/OMTFHitsTree", help='Name of the tree inside the ROOT files')
     parser.add_argument('--muon_vars', nargs='+', type=str, required=True, help='List of muon variables to extract')
     parser.add_argument('--stub_vars', nargs='+', type=str, required=True, help='List of stub variables to extract')
-    parser.add_argument('--input_vars', nargs='+', type=str, help='List of input stub variables to extract')
+    parser.add_argument('--task', type=str, default='regression', help='Task type (classification or regression)')
     parser.add_argument('--plot_example', action='store_true', help='Plot an example graph')
     parser.add_argument('--save_path', type=str, help='Path to save the dataset')
     parser.add_argument('--load_path', type=str, help='Path to load the dataset')

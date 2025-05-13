@@ -44,7 +44,7 @@ class TrainModelFromGraph:
         self.learning_rate = kwargs.get('learning_rate', 0.001)
         self.epochs = kwargs.get('epochs', 100)
         self.earlystop = kwargs.get('earlystop', 3)
-        self.model_path = kwargs.get('model_path', None)
+        self.model_path = kwargs.get('model_path', 'model_%s/%s.pth' %(self.out_model_path,self.save_tag))
         self.do_validation = kwargs.get('evaluate', False)
         self.do_train = kwargs.get('do_train', False)
         self.hidden_dim = kwargs.get('hidden_dim', 32)
@@ -151,7 +151,7 @@ class TrainModelFromGraph:
         # remove extra dimension in y and put deltaPhi and deltaEta in the data object as edge_attr
         for i in range(0, len(Graphs_for_training_filtered)):
             Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
-            Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)        
+            #Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)        
 
 
         Graphs_for_training_filtered = [
@@ -276,6 +276,9 @@ class TrainModelFromGraph:
         print(f"Loading model from {self.model_path}")
         # load the model, first try state_dict then the model itself
         try:
+            print("Loading state_dict")
+            print(self.model_path)
+            print(self.device)
             self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
         except:
             self.model = torch.load(self.model_path, map_location=self.device)
