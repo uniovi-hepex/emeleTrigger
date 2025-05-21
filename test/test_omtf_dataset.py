@@ -10,8 +10,8 @@ sys.path.append(os.path.join(os.getcwd(), '.', 'tools','training'))
 
 from OMTFDataset import OMTFDataset,remove_empty_or_nan_graphs
 
-if os.path.exists("/eos/user/a/acardini/INTREPID/Graphs_v250514/MuGun_Displaced/"):
-    ROOTDIR = "/eos/user/a/acardini/INTREPID/Graphs_v250514/MuGun_Displaced/"
+if os.path.exists("/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250514/"):
+    ROOTDIR = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250514/"
 else: 
     ROOTDIR = "../../data/MuGun_Displaced_v250409_Dumper_l1omtf_001.root"
 
