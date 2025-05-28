@@ -43,7 +43,6 @@ class OMTFDataset(Dataset):
         self.root_dir   = kwargs.get("root_dir")
         self.tree_name  = kwargs.get("tree_name", "simOmtfPhase2Digis/OMTFHitsTree")
         self.muon_vars  = kwargs.get("muon_vars", [])
-        print("Muon vars: ", self.muon_vars, type(self.muon_vars))
         self.omtf_vars  = kwargs.get("omtf_vars", [])
         self.stub_vars  = kwargs.get("stub_vars", [])
         self.task       = kwargs.get("task", "regression")
