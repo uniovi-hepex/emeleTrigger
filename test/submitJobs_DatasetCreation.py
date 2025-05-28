@@ -6,14 +6,11 @@ print('START\n')
 ########   customization  area #########
 InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250514/" 
 Datasets = ["HTo2LongLivedTo2mu2jets","MuGun_Displaced","MuGun_FullEta_OneOverPt_1to100"] 
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250527/"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250528/"
 
 queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
 
-#MuonVars = "\'muonQOverPt\',\"muonQPt\",\'muonPropEta\',\'muonPropPhi\',\'muonDxy\'"
-#OmtfVars = "\'omtfEta\',\'omtfPhi\',\'omtfPt\',\'omtfUPt\'"
-#StubVars =  "\'inputStubEtaG\',\'inputStubPhiG\',\'inputStubR\', \'inputStubLayer\',\'inputStubType\'"
-ConfigFile = "configs/dataset.yml"
+ConfigFile = ["configs/dataset_classification.yml","configs/dataset_regression.yml"]
 Tasks = ['classification','regression']
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/DatasetCreation/"
 GraphFileName = "OmtfDataset_May27"

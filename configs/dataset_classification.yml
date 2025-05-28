@@ -1,0 +1,19 @@
+tree_name: "simOmtfPhase2Digis/OMTFHitsTree"
+muon_vars:
+  - "muonEta"
+  - "muonPhi"
+  - "muonQOverPt"
+  - "muonQPt"
+omtf_vars:
+  - "omtfEta"
+  - "omtfPhi"
+  - "omtfPt"
+  - "omtfUPt"
+stub_vars:
+  - "inputStubEtaG"
+  - "inputStubPhiG"
+  - "inputStubR"
+  - "inputStubLayer"
+  - "inputStubType"
+target_vars:
+  - "inputStubIsMatched"

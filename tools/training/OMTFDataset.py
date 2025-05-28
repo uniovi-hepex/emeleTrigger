@@ -40,17 +40,18 @@ class OMTFDataset(Dataset):
                 print(f"Setting {key} from config file: {value}")
                 kwargs[key] = value
 
-        self.root_dir   = kwargs.get("root_dir")
-        self.tree_name  = kwargs.get("tree_name", "simOmtfPhase2Digis/OMTFHitsTree")
-        self.muon_vars  = kwargs.get("muon_vars", [])
-        self.omtf_vars  = kwargs.get("omtf_vars", [])
-        self.stub_vars  = kwargs.get("stub_vars", [])
-        self.task       = kwargs.get("task", "regression")
-        self.max_files  = kwargs.get("max_files")
-        self.max_events = kwargs.get("max_events")
-        self.debug      = kwargs.get("debug", False)
+        self.root_dir      = kwargs.get("root_dir")
+        self.tree_name     = kwargs.get("tree_name", "simOmtfPhase2Digis/OMTFHitsTree")
+        self.muon_vars     = kwargs.get("muon_vars", [])
+        self.omtf_vars     = kwargs.get("omtf_vars", [])
+        self.stub_vars     = kwargs.get("stub_vars", [])
+        self.target_vars   = kwargs.get("target_vars", [])
+        self.task          = kwargs.get("task", "regression")
+        self.max_files     = kwargs.get("max_files")
+        self.max_events    = kwargs.get("max_events")
+        self.debug         = kwargs.get("debug", False)
         self.pre_transform = kwargs.get("pre_transform")
-        self.transform  = kwargs.get("transform")
+        self.transform     = kwargs.get("transform")
 
         if "dataset" in kwargs and kwargs["dataset"] is not None:
             self.dataset = kwargs["dataset"]
@@ -110,17 +111,13 @@ class OMTFDataset(Dataset):
                     continue
 
                 # Now create nodes and edges: 
-                node_features = None 
-                target_features = None
+                node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32)
+                target_features = torch.tensor([event[st] for st in self.target_vars], dtype=torch.float32)
                 
                 if self.task == 'classification':
-                    node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32).T
-                    target_features = torch.tensor([event['inputStubIsMatched']], dtype=torch.float32).T
                     edge_index, edge_attr = self.create_edges(event, 'inputStub')               
                 elif self.task == 'regression':
-                    node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32).T
-                    target_features = torch.tensor([event["muonQOverPt"]], dtype=torch.float32).T
-                    edge_index, edge_attr = self.create_edges(event, self.task)               
+                    edge_index, edge_attr = self.create_edges(event)               
 
                 data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=target_features, dtype=torch.float)
 
