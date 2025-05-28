@@ -110,6 +110,20 @@ class plotter(object):
             self.df[dataset]=branches.sample(frac=self.options.fraction)
             if self.verbose: print('Downsampling done')
     
+    def addVariables(self):
+        print("Adding variables to datasets")
+        for dataset in self.datasets:
+            if self.verbose:
+                print(f"Agregando variables a {dataset}")
+            df = self.df[dataset]
+            # Verificar que existan las columnas 'muonCharge' y 'muonPt'
+            if "muonCharge" in df.columns and "muonPt" in df.columns:
+                df["muonQPt"] = df["muonCharge"] * df["muonPt"]
+                df["muonQOverPt"] = df["muonCharge"] / df["muonPt"]
+            else:
+                print(f"[WARNING] El dataset {dataset} no contiene 'muonCharge' y/o 'muonPt'")
+            self.df[dataset] = df 
+
     def loadVariableFromDataset_tonumpy(self, plot, dataset,index):
         variable = self.plots[plot]["variable"][index]
         cuts = ""
@@ -212,6 +226,7 @@ try:
     def run(self):
         if self.verbose: print("Loading files....")
         self.loadFiles()
+        self.addVariables()
         if self.verbose: print("Initializating histograms....")
         self.plotHistograms()
         if self.verbose: print("Done!")

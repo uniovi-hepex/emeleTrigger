@@ -44,11 +44,11 @@ class TrainModelFromGraph:
         self.learning_rate = kwargs.get('learning_rate', 0.001)
         self.epochs = kwargs.get('epochs', 100)
         self.earlystop = kwargs.get('earlystop', 3)
-        self.model_path = kwargs.get('model_path', '%s/model_%s.pth' %(self.out_model_path,self.save_tag))
         self.do_validation = kwargs.get('evaluate', False)
         self.do_train = kwargs.get('do_train', False)
         self.hidden_dim = kwargs.get('hidden_dim', 32)
-        self.model_type = kwargs.get('model_type', 'SAGE')
+        self.model_type = kwargs.get('model_type', 'SAGE')         
+        self.model_path = kwargs.get('model_path', f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{self.epochs}epochs_{self.save_tag}.pth") 
         self.normalization = kwargs.get('normalization', 'NodesAndEdgesAndOnlySpatial')
         self.num_files = kwargs.get('num_files', None)  # Número de archivos a cargar
         self.device = kwargs.get('device', 'cuda')
