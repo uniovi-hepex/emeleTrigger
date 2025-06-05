@@ -47,8 +47,8 @@ class OMTFDataset(Dataset):
         self.stub_vars     = kwargs.get("stub_vars", [])
         self.target_vars   = kwargs.get("target_vars", [])
         self.task          = kwargs.get("task", "regression")
-        self.max_files     = kwargs.get("max_files")
-        self.max_events    = kwargs.get("max_events")
+        self.max_files     = kwargs.get("max_files", None)  # None means no limit
+        self.max_events    = kwargs.get("max_events",None)
         self.debug         = kwargs.get("debug", False)
         self.pre_transform = kwargs.get("pre_transform")
         self.transform     = kwargs.get("transform")
@@ -91,6 +91,7 @@ class OMTFDataset(Dataset):
             raise ValueError(f"{self.root_dir} is not a valid directory or ROOT file")
 
         for root_file in root_files:
+            print(f"Processing file: {root_file}")
             if self.max_files is not None and files_processed >= self.max_files:
                 break
             
@@ -101,7 +102,7 @@ class OMTFDataset(Dataset):
             arr = self.add_extra_vars_to_tree(arr)
 
             for event in ak.to_list(arr):
-                if events_processed % 1000 == 0:
+                if events_processed % 500 == 0:
                     print(f"Processed {events_processed} events")
                 if self.max_events is not None and events_processed >= self.max_events:
                     break
@@ -111,8 +112,12 @@ class OMTFDataset(Dataset):
                     continue
 
                 # Now create nodes and edges: 
-                node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32)
-                target_features = torch.tensor([event[st] for st in self.target_vars], dtype=torch.float32)
+                node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32).transpose(0,1)
+                target_tensor = torch.tensor([event[st] for st in self.target_vars], dtype=torch.float32)
+                if target_tensor.dim() == 2:
+                    target_features = target_tensor.transpose(0, 1)
+                else:
+                    target_features = target_tensor
                 
                 if self.task == 'classification':
                     edge_index, edge_attr = self.create_edges(event, 'inputStub')               
@@ -278,7 +283,7 @@ class OMTFDataset(Dataset):
 
 def main():
     import argparse
-    from torch_geometric.data import DataLoader
+    from torch_geometric.loader import DataLoader
 
     parser = argparse.ArgumentParser(description="Load ROOT files and create a PyTorch Geometric dataset")
     parser.add_argument('--config', type=str, help='Path to the configuration file with parameters')

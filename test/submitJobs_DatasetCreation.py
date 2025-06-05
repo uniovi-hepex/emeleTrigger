@@ -6,18 +6,17 @@ print('START\n')
 ########   customization  area #########
 InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250514/" 
 Datasets = ["HTo2LongLivedTo2mu2jets","MuGun_Displaced","MuGun_FullEta_OneOverPt_1to100"] 
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250528/"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250530/"
 
-queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
+queue = "longlunch" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
 
 ConfigFile = ["configs/dataset_classification.yml","configs/dataset_regression.yml"]
 Tasks = ['classification','regression']
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/DatasetCreation/"
-GraphFileName = "OmtfDataset_May27"
+GraphFileName = "OmtfDataset_May30"
 ########   customization end   #########
 
 path = os.getcwd()
-ConfigFile = os.path.join(path, ConfigFile)
 print('do not worry about folder creation:\n')
 if os.path.exists(WORKDIR):
     os.system(f"rm -rf {WORKDIR}")
@@ -68,11 +67,12 @@ for dataset in Datasets:
             fout.write("echo 'WORKDIR ' ${PWD}\n")
             fout.write("cd "+str(path)+"\n")
             fout.write("source %s/pyenv/bin/activate\n" %(path))
-            for task in Tasks:
+            for idx, task in enumerate(Tasks):
+                config_file = os.path.join(path, ConfigFile[idx])
                 fout.write("echo 'Running With Task: %s' \n" %(task))
                 output_graph_name = "%s/%s_%s_%03d.pt" %(odir, GraphFileName, task, i)
                 fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
-                fout.write("python tools/training/OMTFDataset.py --root_dir %s --config %s --save_path %s --task %s \n" %(idir+ifile, ConfigFile, output_graph_name, task))  
+                fout.write("python tools/training/OMTFDataset.py --root_dir %s --config %s --save_path %s --task %s \n" %(idir+ifile, config_file, output_graph_name, task))  
             fout.write("echo 'STOP---------------'\n")
             fout.write("echo\n")
             fout.write("echo\n")

@@ -6,23 +6,27 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.join(os.getcwd(), '.', 'tools', 'training'))
 
 from TrainModelFromGraph import TrainModelFromGraph
-from validation import plot_graph_feature_histograms, plot_prediction_results, evaluate_model
+from validation import plot_graph_features, plot_prediction_results, evaluate_model
 from models import GraphSAGEModel
 
-model_type = "SAGE"
-hidden_dim = 32
-normalization = "NodesAndEdgesAndOnlySpatial"
-graph_path = "/eos/user/a/acardini/INTREPID/Graphs_v250514/MuGun_Displaced/"
-output_dir = "./test_out_model/"
+config_file = "./configs/training_classification.yml"
+graph_path = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250530/HTo2LongLivedTo2mu2jets/"
+output_dir = "./test_HTo2LongLivedTo2mu2jet/"
+save_tag = "SAGE_NodesAndEdgesAndOnlySpatial_Bsize64_lr5e-4_250603_allConnections"
+graph_name = "OmtfDataset_May30_classification"
 
-trainer = TrainModelFromGraph(model_type=model_type, hidden_dim=hidden_dim, normalization=normalization, graph_path=graph_path, out_model_path="./test_out_model/", save_tag="SAGE_NodesAndEdgesAndOnlySpatial_Bsize64_lr5e-4_250115_allConnections", batch_size=1024, learning_rate=0.001, num_files=20, graph_name="OmtfDataset_Apr23_muonQPt", epochs=50)
+trainer = TrainModelFromGraph(config=config_file, graph_path=graph_path, out_model_path=output_dir, save_tag=save_tag, graph_name=graph_name, plot_graph_features=True,task='classification')
 
+print("Using model type:", trainer.model_type)
+print("Loading model...")
 trainer.load_data()
+print("Data loaded. Initializing model...")
 trainer.initialize_model()
+print("Model initialized. Preparing for training...")
 
 ## Now for validation of the graph features: 
-from validation import plot_graph_feature_histograms
-plot_graph_feature_histograms(trainer.train_loader, output_dir=output_dir,label=trainer.save_tag)
+from validation import plot_graph_features
+plot_graph_features(trainer.train_loader, output_dir=output_dir,label=trainer.save_tag)
 
 ## Now for training the model
 trainer.Training_loop()

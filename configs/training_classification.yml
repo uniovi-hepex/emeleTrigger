@@ -1,0 +1,9 @@
+# Configuration for training a classification model using SAGE
+model_type: "SAGE"
+hidden_dim: 32
+normalization: "NodesAndEdgesAndOnlySpatial"
+batch_size: 1024
+learning_rate: 0.001
+num_files: 20
+epochs: 50
+task: "classification"

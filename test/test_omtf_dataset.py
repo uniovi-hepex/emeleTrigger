@@ -16,17 +16,18 @@ else:
     ROOTDIR = "../../data/MuGun_Displaced_v250409_Dumper_l1omtf_001.root"
 
 print("Creating the dataset")
-mu_vars = ['muonQOverPt',"muonQPt",'muonPropEta', 'muonPropPhi','muonDxy']
-omtf_vars = ['omtfEta','omtfPhi','omtfPt','omtfUPt']
-st_vars =  ['inputStubEtaG', 'inputStubPhiG','inputStubR', 'inputStubLayer','inputStubType']
+#config_file = "configs/dataset_classification.yml"
+config_file = "configs/dataset_regression.yml"
 
-dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", muon_vars=mu_vars, stub_vars=st_vars, omtf_vars=omtf_vars, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs, task='regression', debug=True)
+dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", config=config_file, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs, task='regression', debug=True)
 
 print("Checking the dataset ")
 print("Length of the dataset: ", len(dataset))
 print(dataset[6])
 print(dataset[6].x)
 print(dataset[6].y)
+print(dataset[6].muon_vars)
+print(dataset[6].omtf_vars)
 print(dataset[6].edge_index)
 
 print("Saving the dataset")
@@ -44,6 +45,8 @@ print("Length of the dataset2: ", len(dataset2))
 print(dataset2[6])
 print(dataset2[6].x)
 print(dataset2[6].y)
+print(dataset2[6].muon_vars)
+print(dataset2[6].omtf_vars)
 print(dataset2[6].edge_index)
 
 

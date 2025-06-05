@@ -1,7 +1,6 @@
 import torch
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import Compose
-from torch_geometric.data import Data
 
 import os,sys
 
@@ -9,10 +8,8 @@ import argparse
 import matplotlib.pyplot as plt
 from models import GATRegressor, GraphSAGEModel, MPLNNRegressor, GCNRegressor
 from transformations import DropLastTwoNodeFeatures,NormalizeNodeFeatures,NormalizeEdgeFeatures,NormalizeTargets
-import pickle
 
-import itertools
-
+import yaml
 
 class TrainModelFromGraph:
     @staticmethod
@@ -33,9 +30,21 @@ class TrainModelFromGraph:
         parser.add_argument('--normalization', type=str, default='NodesAndEdgesAndOnlySpatial', help='Type of normalization to apply')
         parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
         parser.add_argument('--device', type=str, default='cuda', help='Device to use for training')
+        parser.add_argument('--task', type=str, default='regression', help='Task to perform: regression or classification')
         return parser
 
     def __init__(self, **kwargs):
+
+        config_file = kwargs.get("config")
+        if config_file is not None:
+            with open(config_file, "r") as f:
+                config = yaml.safe_load(f)
+            # Combinar: los parámetros ya presentes en kwargs toman prioridad.
+            for key, value in config.items():
+                print(f"Setting {key} from config file: {value}")
+                kwargs[key] = value
+
+
         self.graph_path = kwargs.get('graph_path', 'graph_folder')
         self.graph_name = kwargs.get('graph_name', 'vix_graph_13Nov_3_muonQOverPt')
         self.out_model_path = kwargs.get('out_model_path', 'Bsize_gmp_64_lr5e-4_v3')
@@ -52,6 +61,7 @@ class TrainModelFromGraph:
         self.normalization = kwargs.get('normalization', 'NodesAndEdgesAndOnlySpatial')
         self.num_files = kwargs.get('num_files', None)  # Número de archivos a cargar
         self.device = kwargs.get('device', 'cuda')
+        self.task = kwargs.get('task', 'regression')  # Default task is regression
         
         # Initialize other attributes
         self.train_loader = None
@@ -118,9 +128,10 @@ class TrainModelFromGraph:
         # Loading data from graph and convert it to DataLoader
         graphs = []
         all_files = os.listdir(self.graph_path)
-
         # Filter for .pkl files
         graph_files = [f for f in all_files if (f.endswith('.pkl') or f.endswith('.pt')) and self.graph_name in f]
+        print(f"Found {len(graph_files)} graph files matching '{self.graph_name}' in {self.graph_path}") 
+
         if not graph_files:
             print("No .pkl/.pt files found in the directory.")
             return []
@@ -164,6 +175,7 @@ class TrainModelFromGraph:
 
         # Apply transformations to the load data... 
         if self.transform is not None:
+            print(f"Applying transformations: {self.transform}")
             Graphs_for_training_filtered = [self.transform(data) for data in Graphs_for_training_filtered]
 
         Graphs_for_training_filtered = [
@@ -286,6 +298,7 @@ class TrainModelFromGraph:
 def main():
 
     parser = argparse.ArgumentParser(description="Train and evaluate GNN model")
+    parser.add_argument('--config', type=str, help='Path to the configuration file with parameters')
     parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
     parser.add_argument('--graph_name', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Name of the graph data')
     parser.add_argument('--save_tag', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Tag for saving the model')
@@ -304,6 +317,7 @@ def main():
     parser.add_argument('--do_train', action='store_true', help='Train the model')
     parser.add_argument('--do_validation', action='store_true', help='Evaluate the model')
     parser.add_argument('--device', type=str, default='cuda', help='Device to use for training')
+    parser.add_argument('--task', type=str, default='regression', help='Task to perform: regression or classification')
 
     args = parser.parse_args()
 
@@ -313,8 +327,9 @@ def main():
     trainer.initialize_model()
 
     if args.plot_graph_features: 
-        from validation import plot_graph_feature_histograms
-        plot_graph_feature_histograms(trainer.train_loader, output_dir=args.output_dir,label=trainer.save_tag)
+        from validation import plot_graph_features
+        print("Plotting graph features for task :", args.task)
+        plot_graph_features(trainer.train_loader, output_dir=args.output_dir,label=trainer.save_tag, task=args.task)
 
     if args.do_train:
         trainer.Training_loop()

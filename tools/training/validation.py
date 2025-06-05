@@ -3,7 +3,54 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-def plot_graph_feature_histograms(data_loader, output_dir='Train', label='Model'):   
+def plot_graph_features(data_loader, output_dir='Train', label='Model',task="regression"):
+    if task == "regression":
+        plot_graph_feature_regression(data_loader, output_dir, label)
+
+    elif task == "classification":
+        plot_graph_feature_classification(data_loader, output_dir, label)
+
+def plot_graph_feature_classification(data_loader, output_dir='Train', label='Model'):
+    feature_names = ["eta", "phi", "R",  "deltaPhi", "deltaEta", "isMatched"]
+
+    for batch in data_loader:
+        features = batch.x.numpy()
+        classification = batch.y.numpy()
+        num_features = features.shape[1]
+        fig, axs = plt.subplots(2, 3, figsize=(15, 15))
+        axs = axs.flatten()
+        
+        # Plot node features
+        for i in range(num_features):
+            axs[i].hist(features[:, i], bins=30, alpha=0.75)
+            axs[i].set_title(f'Feature {feature_names[i]} Histogram')
+            axs[i].set_xlabel(f'Feature {feature_names[i]} Value')
+            axs[i].set_ylabel('Frequency')
+        
+        
+        # plot the number of edges of each graph
+        for i in range(batch.edge_attr.shape[1]):
+            axs[i+num_features].hist(batch.edge_attr[:, i], bins=30, alpha=0.75)
+            axs[i+num_features].set_title(f'Feature {feature_names[i+num_features]} Histogram')
+            axs[i+num_features].set_xlabel(f'Feature {feature_names[i+num_features]} Value')
+            axs[i+num_features].set_ylabel('Frequency')
+        
+        # Plot regression target
+        axs[num_features + (batch.edge_attr.shape[1])].hist(classification, bins=30, alpha=0.75)
+        axs[num_features + (batch.edge_attr.shape[1])].set_title(f'Classification target {feature_names[-1]}  Histogram')
+        axs[num_features + (batch.edge_attr.shape[1])].set_xlabel(f'classification target {feature_names[-1]} Value')
+        axs[num_features + (batch.edge_attr.shape[1])].set_ylabel('Frequency')
+              
+        plt.tight_layout()
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        fig.savefig(os.path.join(output_dir, f'{label}_inputFeatures.png'))
+        fig.savefig(os.path.join(output_dir, f'{label}_inputFeatures.pdf'))
+        fig.savefig(os.path.join(output_dir, f'{label}_inputFeatures.eps'))
+
+
+
+def plot_graph_feature_regression(data_loader, output_dir='Train', label='Model'):   
     feature_names = ["eta", "phi", "R",  "deltaPhi", "deltaEta","Q/pt"]
     for batch in data_loader:
         features = batch.x.numpy()
