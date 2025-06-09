@@ -28,6 +28,7 @@ print("Model initialized. Preparing for training...")
 from validation import plot_graph_features
 plot_graph_features(trainer.train_loader, output_dir=output_dir,label=trainer.save_tag)
 
+sys.exit()
 ## Now for training the model
 trainer.Training_loop()
 
