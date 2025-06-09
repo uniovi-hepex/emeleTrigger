@@ -16,10 +16,15 @@ else:
     ROOTDIR = "../../data/MuGun_Displaced_v250409_Dumper_l1omtf_001.root"
 
 print("Creating the dataset")
-#config_file = "configs/dataset_classification.yml"
-config_file = "configs/dataset_regression.yml"
+regression=False
 
-dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", config=config_file, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs, task='regression', debug=True)
+if regression: 
+    config_file = "configs/dataset_regression.yml"
+    dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", config=config_file, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs, task='regression', debug=True)
+else:
+    config_file = "configs/dataset_classification.yml"
+    dataset = OMTFDataset(root_dir=ROOTDIR, tree_name="simOmtfPhase2Digis/OMTFHitsTree", config=config_file, max_events=1000,max_files=1, pre_transform=remove_empty_or_nan_graphs, task='classification', debug=True)
+
 
 print("Checking the dataset ")
 print("Length of the dataset: ", len(dataset))

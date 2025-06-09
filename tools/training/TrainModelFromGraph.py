@@ -6,7 +6,7 @@ import os,sys
 
 import argparse
 import matplotlib.pyplot as plt
-from models import GATRegressor, GraphSAGEModel, MPLNNRegressor, GCNRegressor
+from models import GATRegressor, GraphSAGEModel, MPLNNRegressor, GCNRegressor, GCNNodeClassifier
 from transformations import DropLastTwoNodeFeatures,NormalizeNodeFeatures,NormalizeEdgeFeatures,NormalizeTargets
 
 import yaml
@@ -160,8 +160,8 @@ class TrainModelFromGraph:
         ]
 
         # remove extra dimension in y and put deltaPhi and deltaEta in the data object as edge_attr
-        for i in range(0, len(Graphs_for_training_filtered)):
-            Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
+        #for i in range(0, len(Graphs_for_training_filtered)):
+        #    Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
             #Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)        
 
 
@@ -206,20 +206,36 @@ class TrainModelFromGraph:
     def initialize_model(self):
         num_node_features = 3
         hidden_dim = self.hidden_dim
-        output_dim = 1 ## ONE FEATURE ONLY!!!
+        if self.task == 'classification':
+            output_dim = 1  # For classification, we use 2 output features (logits for binary classification)
+        else:
+            # For regression, we use 1 output feature
+            print("Using regression task")
+            output_dim = 1 ## ONE FEATURE ONLY!!!
+        
         print(f"Using device: {self.device}")
-        if self.model_type == 'GAT':
+
+        if self.model_type == 'GAT' and self.task == 'regression':
             self.model = GATRegressor(num_node_features=num_node_features, hidden_dim=hidden_dim, output_dim=output_dim).to(self.device)
-        elif self.model_type == 'SAGE':
+        elif self.model_type == 'SAGE' and self.task == 'regression':
             self.model = GraphSAGEModel(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
-        elif self.model_type == 'MPNN':
+        elif self.model_type == 'MPNN' and self.task == 'regression':
             self.model = MPLNNRegressor(in_channels=num_node_features).to(self.device)
-        elif self.model_type == 'GCN':
+        elif self.model_type == 'GCN' and self.task == 'regression':
             self.model = GCNRegressor(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
+        elif self.model_type == 'GCN' and self.task == 'classification':
+            print("Using GCN for classification task")
+            self.model = GCNNodeClassifier(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
         #self.model = torch_geometric.compile(self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self.loss_fn = torch.nn.MSELoss()
 
+        if self.task == 'classification':
+            self.loss_fn = torch.nn.BCEWithLogitsLoss()
+        elif self.task == 'regression':
+            # For regression, we use MSE loss
+            print("Using MSE loss for regression task")
+            self.loss_fn = torch.nn.MSELoss()
+        
         print("Model initialized")
         print(self.model)
 
@@ -230,7 +246,11 @@ class TrainModelFromGraph:
             data = data.to(self.device)  # Move data to the device
             self.optimizer.zero_grad()
             out = self.model(data)
-            loss = self.loss_fn(out, data.y.view(out.size()))
+            if self.task == 'classification':
+                # For BCEWithLogitsLoss, targets should be float and same shape as output
+                loss = self.loss_fn(out, data.y.float())
+            else:
+                loss = self.loss_fn(out, data.y.view(out.size()))
             loss.backward()
             self.optimizer.step()
             total_loss += loss.item()
@@ -245,7 +265,11 @@ class TrainModelFromGraph:
         for data in loader:
             data = data.to(self.device)
             out = self.model(data)
-            loss = self.loss_fn(out, data.y.view(out.size()))
+            if self.task == 'classification':
+                # For BCEWithLogitsLoss, targets should be float and same shape as output
+                loss = self.loss_fn(out, data.y.float())
+            else:
+                loss = self.loss_fn(out, data.y.view(out.size()))
             total_loss += loss.item()
         return total_loss / len(loader)
 
@@ -272,6 +296,7 @@ class TrainModelFromGraph:
                 counter = 0
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
                 torch.save(self.model.state_dict(), f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{self.epochs}epochs_{self.save_tag}.pth")
+                counter = 0 #
             else:
                 counter += 1 #increment counter
 
@@ -336,10 +361,16 @@ def main():
 
     if args.do_validation:
         trainer.load_trained_model()
-        from validation import plot_prediction_results, evaluate_model
-        regression,prediction = evaluate_model(trainer.model, trainer.test_loader, trainer.device)
-        plot_prediction_results(regression, prediction, output_dir=args.output_dir,model=trainer.model_type, label=trainer.save_tag)
-
+        if args.task == 'regression':
+            from validation import plot_prediction_results, evaluate_model
+            print("Evaluating model for regression task")
+            regression,prediction = evaluate_model(trainer.model, trainer.test_loader, trainer.device)
+            plot_prediction_results(regression, prediction, output_dir=args.output_dir,model=trainer.model_type, label=trainer.save_tag)
+        elif args.task == 'classification':
+            from validation import plot_prediction_results_classification, evaluate_classification_model
+            print("Evaluating model for classification task")
+            classification, prediction = evaluate_classification_model(trainer.model, trainer.test_loader, trainer.device)
+            plot_prediction_results_classification(classification, prediction, output_dir=args.output_dir, model=trainer.model_type, label=trainer.save_tag)
 
 if __name__ == "__main__":
     main()

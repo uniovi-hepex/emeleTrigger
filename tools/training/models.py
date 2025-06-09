@@ -152,3 +152,24 @@ class MPLNNRegressor(torch.nn.Module):
         x = self.lin4(x).squeeze(1)
 
         return x
+
+
+
+class GCNNodeClassifier(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels):
+        super(GCNNodeClassifier, self).__init__()
+        self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        self.conv3 = GCNConv(hidden_channels, out_channels)
+
+    def forward(self, data):
+        x, edge_index = data.x.float(), data.edge_index
+        # Primero se aplican dos capas GCN sin pooling, para preservar la predicción a nivel de nodo.
+        x = F.relu(self.conv1(x, edge_index))
+        x = F.dropout(x, p=0.2, training=self.training)
+        x = F.relu(self.conv2(x, edge_index))
+        x = F.dropout(x, p=0.2, training=self.training)
+        # La capa final devuelve logits para cada nodo (por ejemplo, dos clases: true o fake)
+        out = self.conv3(x, edge_index)
+        return out
+    

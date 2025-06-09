@@ -1,5 +1,5 @@
 # Configuration for training a classification model using SAGE
-model_type: "SAGE"
+model_type: "GCN"
 hidden_dim: 32
 normalization: "NodesAndEdgesAndOnlySpatial"
 batch_size: 1024
