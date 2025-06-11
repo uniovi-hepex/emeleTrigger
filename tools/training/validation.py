@@ -176,9 +176,9 @@ def plot_prediction_results_classification(target, prediction, output_dir='Test'
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
 
     print("Plotting Target")
-    axs[0].hist(target, bins=np.arange(-0.5,1.5,0.5), alpha=0.75, label='Target')
-    axs[0].hist(prediction, bins=np.arange(-0.5,1.5,0.05), alpha=0.75, label='Prediction')
-    axs[0].set_title(f'Regression target and prediction for {model}')
+    axs[0].hist(target, bins=np.arange(-0.05,1.05,0.05), alpha=0.75, label='Target')
+    axs[0].hist(prediction, bins=np.arange(-0.05,1.05,0.05), alpha=0.75, label='Prediction')
+    axs[0].set_title(f'Target and prediction for {model}')
     axs[0].set_xlabel('Value')
     axs[0].set_ylabel('Frequency')
     axs[0].legend()

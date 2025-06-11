@@ -4,9 +4,9 @@ import os,sys
 print('START\n')
 ########   YOU ONLY NEED TO FILL THE AREA BELOW   #########
 ########   customization  area #########
-InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v240725_250115/" # list with all the file directories
+InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250530/" # list with all the file directories
 queue = "workday" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Model_Graphsv240725_QOverPtRegression_250115/"
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Model_v250514_250530_Classification_250611/"
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/TrainingModel/"
 ModelTypes = ['GCN', 'SAGE', 'MPNN']
 NormalizationTypes = ['NodesAndEdgesAndOnlySpatial']

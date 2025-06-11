@@ -124,6 +124,41 @@ class TrainModelFromGraph:
     def set_device(self, device):
         self.device = device
     
+    ## Getters for all parameters:
+    def get_graph_path(self):
+        return self.graph_path
+    def get_graph_name(self):
+        return self.graph_name
+    def get_out_model_path(self):
+        return self.out_model_path
+    def get_save_tag(self):
+        return self.save_tag
+    def get_batch_size(self):
+        return self.batch_size
+    def get_learning_rate(self):
+        return self.learning_rate
+    def get_epochs(self):
+        return self.epochs
+    def get_model_path(self):
+        return self.model_path
+    def get_do_validation(self):
+        return self.do_validation
+    def get_do_train(self):
+        return self.do_train
+    def get_hidden_dim(self):
+        return self.hidden_dim
+    def get_model_type(self):
+        return self.model_type
+    def get_normalization(self):
+        return self.normalization
+    def get_num_files(self):
+        return self.num_files
+    def get_device(self):
+        return self.device
+    def get_task(self):
+        return self.task  
+
+
     def load_data(self):
         # Loading data from graph and convert it to DataLoader
         graphs = []
@@ -284,6 +319,7 @@ class TrainModelFromGraph:
         best_epoch = int(0)
         counter = int(0)
         
+        print(f'Window for early stopping: {window} epochs')
         print("Start training...")
         for epoch in range(self.epochs):
             train_loss = self.train_model(self.train_loader)
@@ -293,11 +329,12 @@ class TrainModelFromGraph:
             if test_loss < best_loss: #found better loss
                 best_loss = test_loss
                 best_epoch = epoch
-                counter = 0
+                print(f'New best loss found at epoch {epoch + 1}: {best_loss:.4f}')
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
                 torch.save(self.model.state_dict(), f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{self.epochs}epochs_{self.save_tag}.pth")
                 counter = 0 #
             else:
+                print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f} (no improvement)')
                 counter += 1 #increment counter
 
             #Stop training if more than X epochs have passed without improvements to the test loss
@@ -336,7 +373,7 @@ def main():
     parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for training')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for training')
-    parser.add_argument('--earlystop', type=int, default=3, help='Number of epochs before closing the training if there is no improvement in the loss')
+    parser.add_argument('--earlystop', type=int, default=10, help='Number of epochs before closing the training if there is no improvement in the loss')
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--do_train', action='store_true', help='Train the model')
@@ -351,22 +388,23 @@ def main():
     trainer.load_data()
     trainer.initialize_model()
 
-    if args.plot_graph_features: 
+    if trainer.get_plot_graph_features:
+        print("Plotting graph features...")
         from validation import plot_graph_features
-        print("Plotting graph features for task :", args.task)
-        plot_graph_features(trainer.train_loader, output_dir=args.output_dir,label=trainer.save_tag, task=args.task)
+        print("Plotting graph features for task :", trainer.get_task())
+        plot_graph_features(trainer.train_loader, output_dir=args.output_dir,label=args.save_tag, task=trainer.get_task())
 
     if args.do_train:
         trainer.Training_loop()
 
     if args.do_validation:
         trainer.load_trained_model()
-        if args.task == 'regression':
+        if trainer.get_task() == 'regression':
             from validation import plot_prediction_results, evaluate_model
             print("Evaluating model for regression task")
             regression,prediction = evaluate_model(trainer.model, trainer.test_loader, trainer.device)
             plot_prediction_results(regression, prediction, output_dir=args.output_dir,model=trainer.model_type, label=trainer.save_tag)
-        elif args.task == 'classification':
+        elif trainer.get_task() == 'classification':
             from validation import plot_prediction_results_classification, evaluate_classification_model
             print("Evaluating model for classification task")
             classification, prediction = evaluate_classification_model(trainer.model, trainer.test_loader, trainer.device)
