@@ -29,12 +29,17 @@ from validation import plot_graph_features
 plot_graph_features(trainer.train_loader, output_dir=output_dir,label=trainer.save_tag)
 
 ## Now for training the model
-trainer.Training_loop()
+#trainer.Training_loop()
 
 ## Once it is trained need some validation: 
 trainer.load_trained_model()
 from validation import plot_prediction_results_classification, evaluate_model_classification
 regression,prediction = evaluate_model_classification(trainer.model, trainer.test_loader, trainer.device)
 plot_prediction_results_classification(regression, prediction, output_dir=output_dir,model=trainer.model_type, label=trainer.save_tag)
+
+from validation import compute_classification_metrics, plot_confusion_matrix
+metrics = compute_classification_metrics(regression, prediction)
+classes = ["False", "True"]
+plot_confusion_matrix(regression, prediction, classes, output_dir=output_dir, label=trainer.save_tag)
 
 

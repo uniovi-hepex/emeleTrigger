@@ -1,4 +1,7 @@
- # pyproject.toml
+
+
+
+# pyproject.toml
 [build-system]
 build-backend = 'poetry.core.masonry.api'
 requires = [
@@ -33,7 +36,7 @@ mplhep = "0.3.31"
 awkward-pandas = "^2023.8.0"
 torch = "^2.3.0"
 torch_geometric = "^2.3.0"  # Añadir la versión de torch_geometric
-
+scikit-learn = "^1.7"
 
 [tool.poetry.group.dev.dependencies]
 black = "23.12.1"

@@ -178,6 +178,9 @@ def plot_prediction_results_classification(target, prediction, output_dir='Test'
     print("Plotting Target")
     axs[0].hist(target, bins=np.arange(-0.05,1.05,0.05), alpha=0.75, label='Target')
     axs[0].hist(prediction, bins=np.arange(-0.05,1.05,0.05), alpha=0.75, label='Prediction')
+    ## Log
+    axs[0].set_xlim(-0.05, 1.05)
+    axs[0].set_yscale('log')
     axs[0].set_title(f'Target and prediction for {model}')
     axs[0].set_xlabel('Value')
     axs[0].set_ylabel('Frequency')
@@ -208,3 +211,65 @@ def plot_prediction_results_classification(target, prediction, output_dir='Test'
     fig.savefig(os.path.join(output_dir, f'{label}_prediction_results.png'))
     fig.savefig(os.path.join(output_dir, f'{label}_prediction_results.pdf'))
     fig.savefig(os.path.join(output_dir, f'{label}_prediction_results.eps'))
+
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
+
+def compute_classification_metrics(y_true, y_pred):
+    # Calcular la matriz de confusión
+    cm = confusion_matrix(y_true, y_pred)
+    # Calcular las métricas
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average="binary", zero_division=0)
+    recall = recall_score(y_true, y_pred, average="binary", zero_division=0)
+    f1 = f1_score(y_true, y_pred, average="binary", zero_division=0)
+    
+    # Imprimir los resultados
+    print("Matriz de confusión:")
+    print(cm)
+    print(f"Accuracy:  {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall:    {recall:.4f}")
+    print(f"F1-score:  {f1:.4f}")
+    
+    return cm, accuracy, precision, recall, f1
+
+
+def plot_confusion_matrix(y_true, y_pred, classes,
+                          normalize=False,
+                          output_dir='Test',
+                          label='SaveModel',
+                          title='Matriz de Confusión',
+                          cmap=plt.cm.Blues):
+    """
+    Esta función imprime y grafica la matriz de confusión.
+    La normalización se aplica si normalize=True.
+    """
+    cm = confusion_matrix(y_true, y_pred)
+    
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    fig = plt.figure(figsize=(6, 6))
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+    
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in np.ndindex(cm.shape):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+    
+    plt.ylabel('Etiqueta Verdadera')
+    plt.xlabel('Etiqueta Predicha')
+    plt.tight_layout()
+    fig.savefig(os.path.join(output_dir, f'{label}_confusion_matrix.png'))
+    fig.savefig(os.path.join(output_dir, f'{label}_confusion_matrix.pdf'))
+    fig.savefig(os.path.join(output_dir, f'{label}_confusion_matrix.eps'))
+
+

@@ -329,7 +329,6 @@ class TrainModelFromGraph:
             if test_loss < best_loss: #found better loss
                 best_loss = test_loss
                 best_epoch = epoch
-                print(f'New best loss found at epoch {epoch + 1}: {best_loss:.4f}')
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
                 torch.save(self.model.state_dict(), f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{self.epochs}epochs_{self.save_tag}.pth")
                 counter = 0 #
