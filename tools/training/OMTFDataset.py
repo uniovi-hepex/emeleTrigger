@@ -62,13 +62,13 @@ class OMTFDataset(Dataset):
         """
         Add some extra variables....
         """
-        if not hasattr(arr, "stubR"):
-            arr['stubR'] = get_stub_r(arr['stubType'], arr['stubEta'], arr['stubLayer'], arr['stubQuality'])
+        if not hasattr(arr, "stubRG"):
+            arr['stubRG'] = get_stub_r(arr['stubType'], arr['stubEta'], arr['stubLayer'], arr['stubQuality'])
         arr['stubEtaG'] = arr['stubEta'] * HW_ETA_TO_ETA_FACTOR
         arr['stubPhiG'] = get_global_phi(arr['stubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
 
-        if not hasattr(arr, "inputStubR"):
-            arr['inputStubR'] = get_stub_r(arr['inputStubType'], arr['inputStubEta'], arr['inputStubLayer'], arr['inputStubQuality'])
+        if not hasattr(arr, "inputStubRG"):
+            arr['inputStubRG'] = get_stub_r(arr['inputStubType'], arr['inputStubEta'], arr['inputStubLayer'], arr['inputStubQuality'])
         arr['inputStubEtaG'] = arr['inputStubEta'] * HW_ETA_TO_ETA_FACTOR
         arr['inputStubPhiG'] = get_global_phi(arr['inputStubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
 

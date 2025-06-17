@@ -64,3 +64,6 @@ for i in range(len(dataset)):
     assert torch.all(torch.eq(dataset[i].y, dataset2[i].y)), f"Mismatch in y for index {i}"
 
 
+## Now take a dataset and plot some graphs: features, muon vars, omtf vars, edge_index, edge_attr, target and number of edges / nodes
+print("Plotting some graphs from the dataset2")
+
