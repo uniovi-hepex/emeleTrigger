@@ -69,33 +69,37 @@ class _MPL(MessagePassing):
 class MPLNNRegressor(BaseGNN):
     """Stack 4×MPL, dual attentional pooling + small MLP head."""
 
-    def __init__(self, in_channels: int, dropout_p: float = 0.2) -> None:
+    def __init__(
+        self,
+        in_channels: int,
+        hidden_channels: int = 64,
+        out_channels: int = 1,
+        dropout_p: float = 0.2,
+    ) -> None:
         super().__init__()
-        self.dropout_p = dropout_p
         self.input_dim = in_channels
-        self.hidden_dim = 64
-        self.output_dim = 1
+        self.hidden_dim = hidden_channels
+        self.output_dim = out_channels
+        self.dropout_p = dropout_p
 
-        self.conv1 = _MPL(in_channels, 128)
-        self.conv2 = _MPL(128, 64)
-        self.conv3 = _MPL(64, 64)
-        self.conv4 = _MPL(64, 64)
+        self.conv1 = _MPL(in_channels, hidden_channels * 2)
+        self.conv2 = _MPL(hidden_channels * 2, hidden_channels)
+        self.conv3 = _MPL(hidden_channels, hidden_channels)
+        self.conv4 = _MPL(hidden_channels, hidden_channels)
 
-        self.global_att_pool1 = AttentionalAggregation(nn.Linear(64, 1))
-        self.global_att_pool2 = AttentionalAggregation(nn.Linear(64, 1))
+        self.global_att_pool1 = AttentionalAggregation(nn.Linear(hidden_channels, 1))
+        self.global_att_pool2 = AttentionalAggregation(nn.Linear(hidden_channels, 1))
 
         self.head = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(hidden_channels * 2, hidden_channels * 2),
             nn.ReLU(),
             nn.Dropout(dropout_p),
-            nn.Linear(128, 16),
+            nn.Linear(hidden_channels * 2, hidden_channels),
             nn.ReLU(),
-            nn.Linear(16, 16),
+            nn.Linear(hidden_channels, hidden_channels),
             nn.ReLU(),
-            nn.Linear(16, 1),
+            nn.Linear(hidden_channels, out_channels),
         )
-
-    # ------------------------------------------------------------------ #
 
     def forward(self, data):  # type: ignore[override]
         x, edge_index, batch = data.x.float(), data.edge_index, data.batch
@@ -111,5 +115,5 @@ class MPLNNRegressor(BaseGNN):
         x = F.relu(self.conv4(x, edge_index))
         x2 = self.global_att_pool2(x, batch)
 
-        x = torch.cat([x1, x2], dim=1)  # (B, 128)
+        x = torch.cat([x1, x2], dim=1)
         return self.head(x).squeeze(-1)

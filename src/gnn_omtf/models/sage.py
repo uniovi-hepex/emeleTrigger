@@ -15,7 +15,7 @@ from .gnn_base import BaseGNN, register_model
 @register_model("sage")
 @register_model("graphsage")  # alias
 class GraphSAGEModel(BaseGNN):
-    """4-layer SAGE + mean-pool → MLP head."""
+    """4-layer GraphSAGE + mean-pool → MLP head."""
 
     def __init__(
         self,
@@ -30,14 +30,12 @@ class GraphSAGEModel(BaseGNN):
         self.hidden_dim = hidden_channels
         self.output_dim = out_channels
 
-        self.convs = nn.ModuleList(
-            [
-                SAGEConv(in_channels, hidden_channels * 4),
-                SAGEConv(hidden_channels * 4, hidden_channels * 2),
-                SAGEConv(hidden_channels * 2, hidden_channels * 2),
-                SAGEConv(hidden_channels * 2, hidden_channels * 2),
-            ]
-        )
+        self.convs = nn.ModuleList([
+            SAGEConv(in_channels, hidden_channels * 4),
+            SAGEConv(hidden_channels * 4, hidden_channels * 2),
+            SAGEConv(hidden_channels * 2, hidden_channels * 2),
+            SAGEConv(hidden_channels * 2, hidden_channels * 2),
+        ])
 
         self.mlp = nn.Sequential(
             nn.Linear(hidden_channels * 2, hidden_channels * 2),
@@ -49,8 +47,6 @@ class GraphSAGEModel(BaseGNN):
             nn.ReLU(),
             nn.Linear(hidden_channels, out_channels),
         )
-
-    # ------------------------------------------------------------------ #
 
     def forward(self, data):  # type: ignore[override]
         x, edge_index, batch = data.x.float(), data.edge_index, data.batch

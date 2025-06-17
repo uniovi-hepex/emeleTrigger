@@ -40,3 +40,7 @@ configs/local_paths.yaml
 debug_smoke/
 
 run_compress/
+
+#Runs de OPTUNA
+
+optuna_runs/

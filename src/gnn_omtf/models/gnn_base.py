@@ -21,6 +21,8 @@ from typing import Dict, Type
 
 import torch
 from torch import nn
+import inspect
+
 
 __all__ = ["BaseGNN", "register_model"]
 
@@ -66,18 +68,31 @@ class BaseGNN(nn.Module, metaclass=abc.ABCMeta):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ convenience tools #
 
+
     @staticmethod
     def get(name: str, **kwargs) -> "BaseGNN":
-        """Factory method: `BaseGNN.get("gat", **cfg)`."""
+        """Factory method: `BaseGNN.get("gat", **cfg)` with argument filtering."""
         key = name.lower()
-        try:
-            cls = MODEL_REGISTRY[key]
-        except KeyError as err:  # pragma: no cover – tested indirectly
+        if key not in MODEL_REGISTRY:
             raise KeyError(
                 f"Unknown model '{name}'. "
                 f"Available: {', '.join(MODEL_REGISTRY)}"
-            ) from err
-        return cls(**kwargs)  # type: ignore[arg-type]
+            )
+
+        cls = MODEL_REGISTRY[key]
+        sig = inspect.signature(cls.__init__)
+        accepted = set(sig.parameters) - {"self", "args", "kwargs"}
+
+        # Filter kwargs to match __init__ of the selected model
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
+        unexpected = set(kwargs) - accepted
+        if unexpected:
+            logging.getLogger("BaseGNN").warning(
+                f"Ignoring unused parameters for model '{name}': {sorted(unexpected)}"
+            )
+
+        return cls(**filtered_kwargs)
+
 
     def num_parameters(self, trainable_only: bool = True) -> int:
         """Return number of (trainable) parameters."""

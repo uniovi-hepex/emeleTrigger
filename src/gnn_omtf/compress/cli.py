@@ -28,21 +28,41 @@ def load_model_with_config(
     if not config_path.exists():
         raise FileNotFoundError(f"Missing model config: {config_path}")
 
+    # load saved config.json
     with open(config_path) as f:
         cfg = json.load(f)
 
+    # infer feature dims either from an explicit dataset or from the saved cfg
     if dataset is not None:
-        graphs = torch.load(dataset)
-        num_node_features = graphs[0].x.size(1)
+        graphs = torch.load(dataset, weights_only=False)
+        num_node_features = graphs[0].x.size(1) if graphs[0].x.dim() > 1 else 1
+        num_edge_features = (
+            graphs[0].edge_attr.size(1)
+            if getattr(graphs[0], "edge_attr", None) is not None
+            else 0
+        )
     else:
         num_node_features = cfg.get("num_node_features", 5)
+        num_edge_features = cfg.get("num_edge_features", 0)
 
+    # assemble model_args dict
+    model_args = cfg.get("model_args", {}).copy()
+
+    # legacy key rename: hidden_dim -> hidden_channels
+    if "hidden_dim" in model_args:
+        model_args["hidden_channels"] = model_args.pop("hidden_dim")
+
+    # ensure required channel args are present
+    model_args.setdefault("in_channels", num_node_features)
+    model_args.setdefault("edge_dim",    num_edge_features)
+
+    # build the model
     model = BaseGNN.get(
         name=cfg["model"],
-        num_node_features=num_node_features,
-        hidden_dim=cfg["hidden_dim"],
+        **model_args
     )
 
+    # load weights
     state = torch.load(ckpt, map_location="cpu", weights_only=False)
     if isinstance(state, dict) and "state_dict" not in state and not hasattr(state, "forward"):
         model.load_state_dict(state)
@@ -52,6 +72,7 @@ def load_model_with_config(
         raise ValueError("Unsupported checkpoint format")
 
     return model
+
 
 
 def write_model_folder(model: torch.nn.Module, out_dir: Path, config_path: Path):

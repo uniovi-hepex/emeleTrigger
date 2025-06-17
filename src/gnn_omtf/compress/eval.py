@@ -26,8 +26,7 @@ def _rebuild_model_from_cfg(cfg: dict) -> nn.Module:
     """(Re)create an *untrained* model from the saved config dict."""
     return BaseGNN.get(
         name=cfg["model"],
-        num_node_features=cfg["num_node_features"],
-        hidden_dim=cfg["hidden_dim"],
+        **cfg.get("model_args", {})  # fallback to empty if missing
     )
 
 

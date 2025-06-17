@@ -23,16 +23,15 @@ class GCNRegressor(BaseGNN):
     def __init__(
         self,
         in_channels: int,
-        
         hidden_channels: int,
         out_channels: int = 1,
         dropout_p: float = 0.2,
     ) -> None:
         super().__init__()
-        self.dropout_p = dropout_p
         self.input_dim = in_channels
         self.hidden_dim = hidden_channels
         self.output_dim = out_channels
+        self.dropout_p = dropout_p
 
         self.convs = nn.ModuleList(
             [
@@ -54,8 +53,6 @@ class GCNRegressor(BaseGNN):
             nn.Linear(hidden_channels, out_channels),
         )
 
-    # ------------------------------------------------------------------ #
-
     def forward(self, data):  # type: ignore[override]
         x, edge_index, edge_weight, batch = (
             data.x.float(),
@@ -69,6 +66,7 @@ class GCNRegressor(BaseGNN):
 
         x = global_max_pool(x, batch)
         return self.mlp(x).squeeze(-1)
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -88,16 +86,14 @@ class GCNNodeClassifier(BaseGNN):
         dropout_p: float = 0.2,
     ) -> None:
         super().__init__()
-        
         self.input_dim = in_channels
         self.hidden_dim = hidden_channels
         self.output_dim = out_channels
         self.dropout_p = dropout_p
+
         self.conv1 = GCNConv(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.conv3 = GCNConv(hidden_channels, out_channels)
-
-    # ------------------------------------------------------------------ #
 
     def forward(self, data):  # type: ignore[override]
         x, edge_index = data.x.float(), data.edge_index

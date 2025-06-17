@@ -38,7 +38,7 @@ def test_full_smoke():
         f"gnn-omtf-train "
         f"--graphs {graphs_pt} "
         f"--model gat "
-        f"--hidden-dim 16 "
+        f"--model-args '{{\"hidden_dim\":16}}' "
         f"--epochs 1 "
         f"--batch-size 8 "
         f"--device cpu "
