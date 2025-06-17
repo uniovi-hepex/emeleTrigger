@@ -11,8 +11,10 @@ omtf_vars:
   - "omtfUPt"
 stub_vars:
   - "stubEtaG"
-  - "stubPhiG"
+  - "stubCosPhi"
+  - "stubSinPhi"
   - "stubR"
+  - "stubPhiG"
   - "stubLayer"
   - "stubType"
 target_vars:

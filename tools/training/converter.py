@@ -105,8 +105,15 @@ def get_stub_r(stubTypes, stubEta, stubLayer, stubQuality):
     if len(rs) != len(stubTypes):
         print('Tragic tragedy. R has len', len(rs), ', stubs have len', len(stubTypes))
     return np.array(rs, dtype=object)
-    
-def getEtaKey(eta):
+
+def getEtaKeySingle(eta):
+    """
+    Returns the eta key based on the absolute value of eta.
+    The eta key is used to categorize the eta into different regions.
+    """
+    if isinstance(eta, list):
+        eta = eta[0]  # If eta is a list, take the first element
+
     if abs(eta) < 0.92:
         return 1
     elif abs(eta) < 1.1:
@@ -117,6 +124,13 @@ def getEtaKey(eta):
         return 4
     else:
         return 5
+    
+def getEtaKey(eta):
+    # convert eta from akward to the list so it can be used in the function
+    if isinstance(eta, list):
+        return [getEtaKeySingle(e) for e in eta]
+    else:
+        return getEtaKeySingle(eta)
     
 def getListOfConnectedLayers(eta):
     etaKey=getEtaKey(eta)    
@@ -168,6 +182,17 @@ def getEdgesFromLogicLayer(logicLayer,withRPC=True):
     else:
         if (logicLayer>=10): return []
         return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer])
+
+
+def get_layer_order(eta, layer):
+    """
+    Returns the order of the layer in the eta region.
+    """
+    layer_order = getListOfConnectedLayers(eta)
+    if layer in layer_order:
+        return layer_order.index(layer)
+    else:
+        return -1  # Layer not found in the order
 
 def remove_empty_or_nan_graphs(data):
     # Verificar si el grafo está vacío

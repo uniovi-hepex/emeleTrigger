@@ -14,8 +14,31 @@ import matplotlib.pyplot as plt
 import yaml
 
 from converter import get_stub_r, get_global_phi, HW_ETA_TO_ETA_FACTOR, getEdgesFromLogicLayer, remove_empty_or_nan_graphs
-from converter import getEdgesFromLogicLayer, HW_ETA_TO_ETA_FACTOR, get_global_phi, get_stub_r
+from converter import getEdgesFromLogicLayer, get_layer_order
 ''' Auxliary functions and variables move to some auxiliary file '''
+
+def add_stubCosPhi(arr, input_field, output_field):
+    # Aplica np.cos directamente sobre el arreglo awkwrd
+    stub_cos = np.cos(arr[input_field])
+    # Agrega el nuevo campo al array
+    arr = ak.with_field(arr, stub_cos, output_field)
+    return arr
+
+def add_stubSinPhi(arr, input_field, output_field):
+    # Aplica np.cos directamente sobre el arreglo awkwrd
+    stub_cos = np.sin(arr[input_field])
+    # Agrega el nuevo campo al array
+    arr = ak.with_field(arr, stub_cos, output_field)
+    return arr
+
+def add_layer_order(arr, eta_field, layer_field, output_field):
+    """
+    Add the layer order to the array based on the eta and layer.
+    """
+    stub_eta   = np.abs(arr[eta_field])
+    stub_layer = np.abs(arr[layer_field])
+    arr = ak.with_field(arr, get_layer_order(stub_eta, stub_layer), output_field)
+    return arr
 
 class OMTFDataset(Dataset):
     def __init__(self, **kwargs):
@@ -62,15 +85,21 @@ class OMTFDataset(Dataset):
         """
         Add some extra variables....
         """
-        if not hasattr(arr, "stubRG"):
-            arr['stubRG'] = get_stub_r(arr['stubType'], arr['stubEta'], arr['stubLayer'], arr['stubQuality'])
+        if not hasattr(arr, "stubR"):
+            arr['stubR'] = get_stub_r(arr['stubType'], arr['stubEta'], arr['stubLayer'], arr['stubQuality'])
         arr['stubEtaG'] = arr['stubEta'] * HW_ETA_TO_ETA_FACTOR
         arr['stubPhiG'] = get_global_phi(arr['stubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
+        arr = add_stubCosPhi(arr, 'stubPhiG', 'stubCosPhi')
+        arr = add_stubSinPhi(arr, 'stubPhiG', 'stubSinPhi')
+        #arr = add_layer_order(arr, 'stubEtaG', 'stubLayer', 'stubLayerOrder')
 
-        if not hasattr(arr, "inputStubRG"):
-            arr['inputStubRG'] = get_stub_r(arr['inputStubType'], arr['inputStubEta'], arr['inputStubLayer'], arr['inputStubQuality'])
+        if not hasattr(arr, "inputStubR"):
+            arr['inputStubR'] = get_stub_r(arr['inputStubType'], arr['inputStubEta'], arr['inputStubLayer'], arr['inputStubQuality'])
         arr['inputStubEtaG'] = arr['inputStubEta'] * HW_ETA_TO_ETA_FACTOR
         arr['inputStubPhiG'] = get_global_phi(arr['inputStubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
+        arr = add_stubCosPhi(arr, 'inputStubPhiG', 'inputStubCosPhi')
+        arr = add_stubSinPhi(arr, 'inputStubPhiG', 'inputStubSinPhi')
+        #arr = add_layer_order(arr, 'inputStubEtaG', 'inputStubLayer', 'inputStubLayerOrder')
 
         arr['muonQPt'] = arr['muonCharge'] * arr['muonPt']
         arr['muonQOverPt'] = arr['muonCharge'] / arr['muonPt']
@@ -110,6 +139,7 @@ class OMTFDataset(Dataset):
                 # drop the event if it has no stubs
                 if (event['stubNo']) == 0 or (event['inputStubNo']) == 0:
                     continue
+               
 
                 # Now create nodes and edges: 
                 node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32).transpose(0,1)
@@ -120,11 +150,12 @@ class OMTFDataset(Dataset):
                     target_features = target_tensor
                 
                 if self.task == 'classification':
-                    edge_index, edge_attr = self.create_edges(event, 'inputStub')               
+                    edge_index, edge_attr, edge_label = self.create_edges(event, 'inputStub')
+                    target_features = None               
                 elif self.task == 'regression':
-                    edge_index, edge_attr = self.create_edges(event)               
+                    edge_index, edge_attr, edge_label = self.create_edges(event)               
 
-                data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=target_features, dtype=torch.float)
+                data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=target_features, edge_label=edge_label, dtype=torch.float)
 
                 # Add extra features to the data object
                 data.muon_vars = torch.tensor([event[var] for var in self.muon_vars], dtype=torch.float)
@@ -149,12 +180,21 @@ class OMTFDataset(Dataset):
     def getDeltaEta(self,eta1,eta2):
         return eta1-eta2
     
+    def getDeltaR(self, r1, r2):
+        """
+        Calculate the delta R between two points 
+        """
+        return r1 - r2
+    
     def create_edges(self, row, stubName='stub'):
         stubLayer = row['%sLayer' % stubName]
         stubPhi = row['%sPhi' % stubName]
         stubEta = row['%sEta' % stubName]
+        stubR = row['%sR' % stubName]
+        stubIsMatched = row['%sIsMatched' % stubName] if '%sIsMatched' % stubName in row else None
         edge_index = []
         edge_attr = []
+        edge_label = []  # This is only used for classification tasks, so it can be empty for regression tasks
         for stub1Id,stub1Layer in enumerate(stubLayer):
             for stub2Id, stub2Layer in enumerate(stubLayer):
                 #print(f'stubt1Id:{stub1Id}   stub1Layer:{stub1Layer}    stubt2Id:{stub2Id}   stub2Layer:{stub2Layer}')
@@ -162,11 +202,13 @@ class OMTFDataset(Dataset):
                 if stub2Layer in getEdgesFromLogicLayer(stub1Layer):
                     dphi = self.getDeltaPhi(stubPhi[stub1Id],stubPhi[stub2Id])
                     deta = self.getDeltaEta(stubEta[stub1Id],stubEta[stub2Id])
+                    dr   = self.getDeltaR(stubR[stub1Id], stubR[stub2Id])
                     edge_index.append([stub1Id, stub2Id])
-                    edge_attr.append([dphi, deta])
+                    edge_attr.append([dphi, deta, dr])
+                    edge_label.append(int(stubIsMatched[stub1Id] and stubIsMatched[stub2Id]) if stubIsMatched is not None else 0)
         edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         edge_attr = torch.tensor(edge_attr, dtype=torch.float)
-        return edge_index, edge_attr
+        return edge_index, edge_attr, edge_label
 
     def len(self):
         return len(self.dataset)
@@ -277,7 +319,7 @@ class OMTFDataset(Dataset):
 
     @staticmethod
     def load_dataset(file_path):
-        dataset = torch.load(file_path)
+        dataset = torch.load(file_path, weights_only=False)
         print(f"Dataset cargado desde {file_path}")
         return OMTFDataset(dataset=dataset)
 

@@ -11,9 +11,13 @@ omtf_vars:
   - "omtfUPt"
 stub_vars:
   - "inputStubEtaG"
-  - "inputStubPhiG"
+  - "inputStubCosPhi"
+  - "inputStubSinPhi"
   - "inputStubR"
   - "inputStubLayer"
+  - "inputStubPhiG"
+  #- "inputStubLayOrder"
   - "inputStubType"
-target_vars:
   - "inputStubIsMatched"
+target_vars:
+  - "muonQOverPt"
