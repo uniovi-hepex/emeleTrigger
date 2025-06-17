@@ -1,0 +1,50 @@
+run_search() (called by gnn-omtf-opt nas …) writes the genotype to the path
+you pass with --out. Nothing else in the repo needs it to be in a special
+folder, so you can decide a layout that matches your workflow:
+
+gnn-omtf/
+├── configs/                  # fixed, hand-written yaml (datasets, h-params…)
+│   └── …
+├── arch/                     # ← good place for *discovered* architectures
+│   └── 2025-06-16_SAGE_GAT.yaml
+└── runs/
+    └── nas/                  # or keep per-experiment dirs under runs/
+        └── longlived_001/
+            ├── genotype.yaml
+            └── log.txt
+
+
+Example command that stores the result into arch/:
+
+gnn-omtf-opt nas \
+  --graphs  /eos/.../ds_regression.pt \
+  --epochs  40 \
+  --out     arch/ds_regression_srch1.yaml
+
+The training CLI can then accept that file:
+
+gnn-omtf-train run \
+  --graphs    /eos/.../ds_regression.pt \
+  --arch-yaml arch/ds_regression_srch1.yaml \
+  --out-dir   runs/train_from_nas
+
+
+
+-----------
+
+ Typical workflow recap
+
+# 1) run NAS
+gnn-omtf-opt nas \
+  --graphs  /eos/.../Graphs_v250514/dataset.pt \
+  --epochs  40 \
+  --layers  3 \
+  --out     arch/llp_regression_3cells.yaml
+
+# 2) re-train the discrete architecture
+gnn-omtf-train run \
+  --graphs    /eos/.../Graphs_v250514/dataset.pt \
+  --arch-yaml arch/llp_regression_3cells.yaml \
+  --hidden-dim 64   # can still sweep this with Optuna
+  --epochs  100 \
+  --out-dir  runs/final_model

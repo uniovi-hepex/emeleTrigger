@@ -1,0 +1,40 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+
+# Packages
+*.egg-info/
+dist/
+build/
+
+# Virtual env / poetry
+.env
+.venv
+/.mypy_cache
+/.pytest_cache
+.dmypy.json
+.poetry/
+
+# Data / artefacts
+*.pt
+*.pkl
+*.root
+runs/
+plots/
+datasets/
+data/*
+src/gnn_omtf/data/omtf/*
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+
+#Local configuration files
+configs/local_paths.yaml
+
+#LOcal projects
+debug_smoke/

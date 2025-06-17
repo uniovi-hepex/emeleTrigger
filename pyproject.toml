@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "gnn-omtf"
+version         = "0.0.1"
+description     = "Graph-Neural-Network toolkit for OMTF studies"
+requires-python = ">=3.9"
+
+dependencies = [
+  "torch>=2.2",
+  "torch-geometric>=2.5",
+  "matplotlib>=3.9",
+  "typer>=0.9",
+  "uproot>=5.0",
+  "awkward>=2.0",
+  "scikit-learn>=1.4",
+  "jinja2>=3.1",          # added for batch templates
+  "PyYAML>=6.0",
+  "optuna>=3.6",
+]
+
+[project.scripts]
+gnn-omtf-data   = "gnn_omtf.data.cli:_main"
+gnn-omtf-train  = "gnn_omtf.training.cli:_main"
+gnn-omtf-batch  = "gnn_omtf.batch.cli:_main"   # NEW HTCondor helper
+gnn-omtf-opt = "gnn_omtf.optim.cli:_main"
+gnn-omtf-compress = "gnn_omtf.compress.cli:_main"
+gnn-omtf-deploy = "gnn_omtf.deploy.cli:_main"
+gnn-omtf-viz = "gnn_omtf.viz.cli:_main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "black",
+  "ruff",
+  "mypy",
+  "pre-commit",
+]
+precision = ["brevitas>=0.10", "protobuf<4"]   # brevitas ONNX export
+
+[tool.pytest.ini_options]
+addopts = "-q"

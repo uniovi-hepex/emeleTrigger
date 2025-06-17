@@ -1,0 +1,17 @@
+# OMTFDataset configuration for **regression** task
+tree_name   : simOmtfPhase2Digis/OMTFHitsTree
+
+# Variables to load from the ROOT tree
+muon_vars   : [muonQPt, muonPt, muonQOverPt]
+stub_vars   : [stubEtaG, stubPhiG, stubR, stubLayer, stubType]
+
+# Target(s) – what the GNN should predict
+target_vars : [muonQOverPt]
+
+# Optional limits (null → no limit)
+max_files   : null     # e.g. 5
+max_events  : null     # e.g. 10000
+
+# Other flags
+task        : regression          # echoed by --task but nice to have here
+debug       : false

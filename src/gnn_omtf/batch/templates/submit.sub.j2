@@ -1,0 +1,11 @@
+executable  = $(filename)
+arguments   = $(ClusterId).$(ProcId)
+output      = {{ logs }}/$(ClusterId).$(ProcId).out
+error       = {{ logs }}/$(ClusterId).$(ProcId).err
+log         = {{ logs }}/$(ClusterId).log
++JobFlavour = "{{ queue }}"
+{% if request_gpus | default(false) -%}
+request_gpus = 1
+{% endif -%}
+
+queue filename matching ({{ logs.parent }}/job_*.sh)

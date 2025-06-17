@@ -1,0 +1,9 @@
+prune:
+  structured: true          # channel-wise (True) vs weight (False)
+  amount: 0.5               # 50 % of channels
+  criterion: l1_unstructured
+  max_metric_drop: 0.01     # abort if >1 % worse than baseline
+
+quant:
+  scheme: dynamic_int8      # {dynamic_int8, qat_int8, fixed_Q}
+  fixed_Q: null             # e.g. "ap_fixed<12,6>" if scheme=fixed_Q

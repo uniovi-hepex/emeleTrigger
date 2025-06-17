@@ -1,0 +1,18 @@
+# Template consumed by `gnn-omtf-batch condor optuna`
+batch:
+  type: optuna
+  trials: 100
+  max_runtime: "8h"
+  queue: workday
+  root_config: configs/hpo.yaml      # passed to optimiser
+  graphs_pt: /eos/.../graphs_reg.pt
+  script: |
+    gnn-omtf-opt hpo \
+        --graphs ${graphs_pt} \
+        --config ${root_config} \
+        --trial-number ${ProcId} \
+        --total-trials ${trials} \
+        --out arch/trial_${ClusterId}_${ProcId}.json
+  log: logs/hpo_optuna_100.log
+
+# gnn-omtf-batch condor --preset configs/batch/hpo_optuna_100.yaml

@@ -1,0 +1,14 @@
+# OMTFDataset configuration for **classification** task
+tree_name   : simOmtfPhase2Digis/OMTFHitsTree
+
+muon_vars   : [muonQPt, muonPt, muonQOverPt]
+stub_vars   : [stubEtaG, stubPhiG, stubR, stubLayer, stubType]
+
+# Integer label – adjust to your ntuple
+target_vars : [isMatched]
+
+max_files   : null
+max_events  : null
+
+task        : classification
+debug       : false

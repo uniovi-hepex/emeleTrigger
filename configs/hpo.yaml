@@ -1,0 +1,30 @@
+# Optuna hyper-parameter sweep for gnn-omtf
+hpo:
+  n_trials: 100
+  timeout_per_trial: 3600   # [s] optional kill-switch
+  sampler: tpe              # {tpe, random, cmaes, nsgaii}
+  pruner: median            # {median, hyperband, none}
+
+search_space:
+  model:
+    name: sage              # gat / gcn / mpl / sage
+    hidden_dim: [32, 64, 128]
+    n_layers:
+      _type_: int
+      low: 2
+      high: 6
+  optimizer:
+    lr:
+      _type_: loguniform
+      low: 1.0e-5
+      high: 1.0e-2
+    weight_decay:
+      _type_: uniform
+      low: 0.0
+      high: 1.0e-3
+  training:
+    batch_size: [256, 512, 1024]
+    epochs: 50
+objective:
+  metric: val_mse
+  mode: minimize
