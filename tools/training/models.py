@@ -172,4 +172,31 @@ class GCNNodeClassifier(torch.nn.Module):
         # La capa final devuelve logits para cada nodo (por ejemplo, dos clases: true o fake)
         out = self.conv3(x, edge_index)
         return out
-    
+
+   
+class EdgeGNNClassifier(nn.Module):
+    def __init__(self, in_channels, edge_in, hidden_channels):
+        super().__init__()
+        # Encoder que usa los atributos de aristas
+        self.conv = TransformerConv(in_channels, hidden_channels, edge_dim=edge_in, heads=4, concat=False)
+        # MLP para clasificar aristas
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(2*hidden_channels + edge_in, hidden_channels),
+            nn.ReLU(),
+            nn.Linear(hidden_channels, 1)
+        )
+
+    def forward(self, x, edge_index, edge_attr):
+        # 1. Obtener embeddings nodales
+        x = self.conv(x, edge_index, edge_attr)  # -> [num_nodes, hidden_channels]
+
+        # 2. Recolectar embeddings de origen y destino
+        src, dst = edge_index
+        x_src = x[src]
+        x_dst = x[dst]
+
+        # 3. Concatenar embeddings + atributos de arista
+        edge_feat = torch.cat([x_src, edge_attr, x_dst], dim=-1)
+
+        # 4. Clasificador: logit por arista
+        return self.edge_mlp(edge_feat).view(-1)

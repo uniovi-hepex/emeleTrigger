@@ -4,6 +4,7 @@ muon_vars:
   - "muonPhi"
   - "muonQOverPt"
   - "muonQPt"
+  - "muonDxy"
 omtf_vars:
   - "omtfEta"
   - "omtfPhi"
@@ -19,3 +20,4 @@ stub_vars:
   - "stubType"
 target_vars:
   - "muonQOverPt"
+  - "muonDxy"

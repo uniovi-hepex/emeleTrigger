@@ -135,6 +135,7 @@ class OMTFDataset(Dataset):
                     print(f"Processed {events_processed} events")
                 if self.max_events is not None and events_processed >= self.max_events:
                     break
+                events_processed += 1
 
                 # drop the event if it has no stubs
                 if (event['stubNo']) == 0 or (event['inputStubNo']) == 0:
@@ -151,7 +152,7 @@ class OMTFDataset(Dataset):
                 
                 if self.task == 'classification':
                     edge_index, edge_attr, edge_label = self.create_edges(event, 'inputStub')
-                    target_features = None               
+                     #target_features = None               
                 elif self.task == 'regression':
                     edge_index, edge_attr, edge_label = self.create_edges(event)               
 
@@ -166,7 +167,6 @@ class OMTFDataset(Dataset):
                     data = self.pre_transform(data)
                 if data is not None:
                     data_list.append(data)
-                events_processed += 1
 
             files_processed += 1
         

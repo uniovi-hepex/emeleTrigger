@@ -14,9 +14,8 @@ stub_vars:
   - "inputStubCosPhi"
   - "inputStubSinPhi"
   - "inputStubR"
-  - "inputStubLayer"
   - "inputStubPhiG"
-  #- "inputStubLayOrder"
+  - "inputStubLayer"
   - "inputStubType"
   - "inputStubIsMatched"
 target_vars:

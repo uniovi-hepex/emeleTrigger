@@ -10,8 +10,8 @@ OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250617
 
 queue = "longlunch" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
 
-ConfigFile = ["configs/dataset_classification.yml","configs/dataset_regression.yml"]
-Tasks = ['classification','regression']
+ConfigFile = ["configs/dataset_classification.yml"] #,"configs/dataset_regression.yml"]
+Tasks = ['classification'] #,'regression']
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/DatasetCreation/"
 GraphFileName = "OmtfDataset_Jun17"
 ########   customization end   #########
