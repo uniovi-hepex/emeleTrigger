@@ -88,6 +88,15 @@ class OMTFDataset(Dataset):
         self.pre_transform = kwargs.get("pre_transform")
         self.transform = kwargs.get("transform")
 
+
+        # ------------------------------------------------------------------
+        # quick helpers needed by the Trainer / HPO code
+        # ------------------------------------------------------------------
+        self.is_classification = self.task.startswith("class")
+        # NOTE: `num_classes` is a @property defined further down; do **not**
+        # assign to it here.  We keep an internal slot instead.
+        self._num_classes = None
+
         # 3. Load from dataset or ROOT
         if "dataset" in kwargs and kwargs["dataset"] is not None:
             self._data: List[Data] = kwargs["dataset"]
@@ -97,6 +106,19 @@ class OMTFDataset(Dataset):
             self._data = self._load_from_root()
         else:
             raise ValueError("Must provide either `dataset` or `root_dir`")
+
+        if self.is_classification and len(self._data):
+            y_all = torch.cat([g.y.reshape(-1).long() for g in self._data])
+            self._num_classes = int(y_all.max().item() + 1)
+
+        # ------------------------------------------------------------------ #
+        # public helpers needed by HPO / Trainer
+        # ------------------------------------------------------------------ #
+    @property
+    def num_classes(self) -> int:
+        """Number of distinct `y` labels (classification only)."""
+        return 1 if not self.is_classification else int(self._num_classes or 0)
+
 
         super().__init__(transform=self.transform, pre_transform=self.pre_transform)
 
@@ -275,7 +297,9 @@ class OMTFDataset(Dataset):
         torch.save(self._data, path)
 
     @classmethod
-    def load_dataset(cls, path: str | Path) -> "OMTFDataset":
+    def load_dataset(
+        cls, path: str | Path, **kwargs
+    ) -> "OMTFDataset":
         """
         Factory that builds a **new** OMTFDataset directly from a .pt/.pkl file.
 
@@ -291,5 +315,63 @@ class OMTFDataset(Dataset):
         """
         graphs = torch.load(path, weights_only=False)
         log.info("✅  Dataset loaded from %s  (graphs = %d)", path, len(graphs))
-        return cls(dataset=graphs)
+        # forward any extra keyword args (e.g. config="…yaml") so they can
+        # override defaults such as task=classification
+        return cls(dataset=graphs, **kwargs)
 
+    @classmethod
+    def load_batched_dict(cls, path: str | Path, **kwargs) -> "OMTFDataset":
+
+        log.info("📦 Loading batched graph dataset from: %s", path)
+        pt_dict = torch.load(path)
+
+        x = pt_dict["x"]
+        edge_index = pt_dict["edge_index"]
+        batch = pt_dict["batch"]
+        y = pt_dict["y"]
+        edge_attr = pt_dict.get("edge_attr", None)
+
+        n_graphs = y.shape[0]
+        log.info("✔️  Found %d graphs | %d total nodes | %d total edges",
+                n_graphs, x.shape[0], edge_index.shape[1])
+
+        graph_list = []
+
+        for g in range(n_graphs):
+            label_vec = y[g]
+
+            # Validate label
+            if not (torch.equal(label_vec, torch.tensor([1, 0])) or torch.equal(label_vec, torch.tensor([0, 1]))):
+                raise ValueError(f"❌ Invalid label at graph {g}: {label_vec.tolist()}")
+
+            # Nodes in this graph
+            node_ids = (batch == g).nonzero(as_tuple=True)[0]
+            global_to_local = {int(n): i for i, n in enumerate(node_ids.tolist())}
+
+            # Edges for this graph
+            edge_mask = (batch[edge_index[0]] == g) & (batch[edge_index[1]] == g)
+            edges_g = edge_index[:, edge_mask]
+            edges_local = edges_g.clone()
+            for i in range(edges_g.shape[1]):
+                edges_local[0, i] = global_to_local[int(edges_g[0, i])]
+                edges_local[1, i] = global_to_local[int(edges_g[1, i])]
+
+            label = torch.tensor([label_vec.argmax().item()], dtype=torch.long)
+
+            data = Data(
+                x=x[node_ids],
+                edge_index=edges_local,
+                y=label
+            )
+
+            if edge_attr is not None:
+                data.edge_attr = edge_attr[edge_mask]
+
+            graph_list.append(data)
+
+            # Optional: progress every N
+            if (g + 1) % 5000 == 0 or g == n_graphs - 1:
+                log.info("…processed %d/%d graphs", g + 1, n_graphs)
+
+        log.info("✅ Finished unpacking %d graphs", len(graph_list))
+        return cls(dataset=graph_list, **kwargs)

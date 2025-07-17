@@ -20,11 +20,14 @@ logging.basicConfig(level=logging.INFO)
 @app.command()
 def hpo(
     graphs: Path = typer.Option(..., exists=True, help="*.pt dataset"),
+    config: Path = typer.Option(
+        None, exists=True, help="YAML created at conversion time"
+    ),
     trials: int = typer.Option(40),
     out: Path = typer.Option("best_hparams.json"),
 ):
     """Bayesian hyper-parameter optimisation via Optuna."""
-    best = run_study(graphs, n_trials=trials)
+    best = run_study(graphs, n_trials=trials, config=config)
     save_best(best, out)
     typer.echo(json.dumps(best, indent=2))
 

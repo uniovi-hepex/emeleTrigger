@@ -22,7 +22,7 @@ def _convert_paths(obj):
 def run(
     graphs:     Path = typer.Option(..., help="*.pt file with saved graphs"),
     out_dir:    Path = typer.Option("runs", help="Output folder"),
-    model:      str  = "gat",
+    model:      str  = "sage_simple_classifier",
     model_args: str  = typer.Option("{}", help="Extra model arguments as JSON string, e.g. '{\"hidden_dim\": 64, \"heads\": 2}'"),
     batch_size: int  = 512,
     lr:         float= 5e-4,

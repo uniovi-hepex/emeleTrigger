@@ -2,8 +2,11 @@ from .regression import (
     regression_metrics,  # <--- keep this as the function
     mse, rmse, bias, resolution, regression_summary,
 )
-from .classification import accuracy, precision_recall_f1
-
+from .classification import (
+    classification_metrics,     # ← NEW ‼
+    accuracy,
+    precision_recall_f1,
+)
 # Move the dict to a different name
 regression_metric_fns = {
     "mse": mse,
@@ -23,3 +26,4 @@ __all__ = [
     "classification_metrics",
     "regression_summary",
 ]
+    

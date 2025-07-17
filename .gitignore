@@ -44,4 +44,7 @@ run_compress/
 #Runs de OPTUNA
 
 optuna_runs/
-best_hprams.json
+best_hparams.json
+
+optuna_runs_0/
+viz/

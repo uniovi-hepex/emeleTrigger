@@ -6,10 +6,10 @@ set -e
 # ---------------------------------------------------------------------
 
 # --- Configurable variables -----------------------------------------
-GRAPH_FILE="graphs.pt"
+GRAPH_FILE="graphs_evan.pt"
 ROOT_DIR="data"  # <-- can be folder or single file
-CONFIG_FILE="configs/dataset_regression.yml"
-TRIALS=40
+CONFIG_FILE="configs/dataset_tau_classification.yml"
+TRIALS=100
 OUTFILE="best_hparams.json"
 
 # ---------------------------------------------------------------------
@@ -48,6 +48,7 @@ fi
 echo "🧠 Running Optuna (trials=$TRIALS)..."
 gnn-omtf-opt hpo \
     --graphs "$GRAPH_FILE" \
+    --config "$CONFIG_FILE" \
     --trials "$TRIALS" \
     --out "$OUTFILE"
 

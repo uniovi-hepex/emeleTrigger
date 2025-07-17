@@ -1,0 +1,28 @@
+# Tau3MuDataset for **binary classification**
+# -------------------------------------------------
+# The CSV → PyG pipeline already built `data.y ∈ {0,1}`
+# where 1 = tau→3μ signal, 0 = min‑bias background.
+
+# ROOT section is *ignored* by our CSV generator, but
+# the wrapper still parses it, so keep dummy entries.
+tree_name   : dummy/tree          # not used
+
+# The wrapper looks for these lists to build node/edge tensors.
+# We map them to the column names in your CSV.
+muon_vars   : []                  # none – labels already present
+stub_vars   :
+  - stub_eta1
+  - stub_phi1
+  - stub_eta2
+  - stub_phi2
+  - stub_tfLayer                # <- five node features
+
+# The framework expects an integer target – here it is `y` in the PyG graph.
+target_vars : [y]                # 0 = background, 1 = signal
+
+# Optional limits; set to null or numeric
+max_files   : null
+max_events  : null
+
+task        : classification      # (<‑‑ important)
+debug       : false
