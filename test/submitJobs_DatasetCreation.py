@@ -4,13 +4,16 @@ import os,sys
 print('START\n')
 ########   YOU ONLY NEED TO FILL THE AREA BELOW   #########
 ########   customization  area #########
-InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250312/SingleMu_FlatPt1to1000_FullEta_Apr04_125X/" # list with all the file directories
-queue = "microcentury" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
-OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250312_250314/SingleMu_FlatPt1to1000/"
-MuonVars = ["muonQOverPt", "muonQPt"]
-StubVars = ["stubEtaG", "stubPhiG", "stubR", "stubLayer", "stubType"]
+InputFolder = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Dumper_Ntuples_v250514/" 
+Datasets = ["HTo2LongLivedTo2mu2jets","MuGun_Displaced","MuGun_FullEta_OneOverPt_1to100"] 
+OutputDir = "/eos/cms/store/user/folguera/L1TMuon/INTREPID/Graphs_v250514_250617/"
+
+queue = "longlunch" # give bsub queue -- 8nm (8 minutes), 1nh (1 hour), 8nh, 1nd (1day), 2nd, 1nw (1 week), 2nw
+
+ConfigFile = ["configs/dataset_classification.yml"] #,"configs/dataset_regression.yml"]
+Tasks = ['classification'] #,'regression']
 WORKDIR = "/afs/cern.ch/user/f/folguera/workdir/INTREPID/tmp/DatasetCreation/"
-GraphFileName = "OmtfDataset_Mar14"
+GraphFileName = "OmtfDataset_Jun17"
 ########   customization end   #########
 
 path = os.getcwd()
@@ -24,43 +27,57 @@ os.makedirs(os.path.join(WORKDIR, "batchlogs"))
 if not os.path.exists(OutputDir):
     print(f"OutputDir {OutputDir} does not exist")
     os.makedirs(OutputDir)
+    for dataset in Datasets:
+        os.makedirs(os.path.join(OutputDir, dataset))
+        print(f"OutputDir: {OutputDir}/{dataset}")
+    print("OutputDir created\n")
+elif os.path.exists(OutputDir) and not os.path.exists(os.path.join(OutputDir, Datasets[0])):
+    print(f"OutputDir {OutputDir} exists but not the dataset folder")
+    for dataset in Datasets:
+        os.makedirs(os.path.join(OutputDir, dataset))
+        print(f"OutputDir: {OutputDir}/{dataset}")
+    print("OutputDir created\n")
 else:
     print("Warning: OutputDir already exists. It will be overwritten\n")
     print(f"OutputDir: {OutputDir}")
 
-## create list of files
-if not os.path.exists(InputFolder):
-    print("InputFolder %s does not exist" %(InputFolder))
-    sys.exit()
-list_of_files = os.listdir(InputFolder)
-
-## print info
-print("InputFolder: %s" %(InputFolder))
-print("OutputDir: %s" %(OutputDir))
-print("Number of files: %d" %(len(list_of_files)))
-
 ##### loop for creating and sending jobs #####
-i=1
-for ifile in list_of_files:
-    ##### creates jobs #######
-    with open('%s/exec/job_%03d.sh' %(WORKDIR,i), 'w') as fout:
-        fout.write("#!/bin/sh\n")
-        fout.write("echo\n")
-        fout.write("echo\n")
-        fout.write("echo 'START---------------'\n")
-        fout.write("echo 'WORKDIR ' ${PWD}\n")
-        fout.write("cd "+str(path)+"\n")
-        fout.write("source %s/pyenv/bin/activate\n" %(path))
-        for muvars in MuonVars:
-            fout.write("echo 'Running With MuonVar: %s' \n" %(muvars))
-            output_graph_name = "%s/%s_%s_%03d.pt" %(OutputDir, GraphFileName, muvars, i)
-            fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
-            fout.write("python tools/training/OMTFDataset.py --root_dir %s --tree_name simOmtfPhase2Digis/OMTFHitsTree --muon_vars [%s] --stub_vars %s --save_path %s \n" %(InputFolder+ifile, muvars, StubVars, output_graph_name))  
-        fout.write("echo 'STOP---------------'\n")
-        fout.write("echo\n")
-        fout.write("echo\n")
-    os.system("chmod 755 %s/exec/job_%03d.sh" %(WORKDIR,i))
-    i+=1
+for dataset in Datasets:
+    i = 1
+    ## create list of files
+    idir = InputFolder+dataset+"/"
+    odir = OutputDir+dataset+"/"
+    if not os.path.exists(idir):
+        print("InputFolder %s does not exist" %(idir))
+        sys.exit()
+    list_of_files = os.listdir(idir)
+
+    ## print info
+    print("InputFolder: %s" %(idir))
+    print("OutputDir: %s" %(odir))
+    print("Number of files: %d" %(len(list_of_files)))
+
+    for ifile in list_of_files:
+        ##### creates jobs #######
+        with open('%s/exec/job_%s_%03d.sh' %(WORKDIR,dataset,i), 'w') as fout:
+            fout.write("#!/bin/sh\n")
+            fout.write("echo\n")
+            fout.write("echo\n")
+            fout.write("echo 'START---------------'\n")
+            fout.write("echo 'WORKDIR ' ${PWD}\n")
+            fout.write("cd "+str(path)+"\n")
+            fout.write("source %s/pyenv/bin/activate\n" %(path))
+            for idx, task in enumerate(Tasks):
+                config_file = os.path.join(path, ConfigFile[idx])
+                fout.write("echo 'Running With Task: %s' \n" %(task))
+                output_graph_name = "%s/%s_%s_%03d.pt" %(odir, GraphFileName, task, i)
+                fout.write("echo 'Saving graphs in %s' \n" %(output_graph_name))
+                fout.write("python tools/training/OMTFDataset.py --root_dir %s --config %s --save_path %s --task %s \n" %(idir+ifile, config_file, output_graph_name, task))  
+            fout.write("echo 'STOP---------------'\n")
+            fout.write("echo\n")
+            fout.write("echo\n")
+        os.system("chmod 755 %s/exec/job_%s_%03d.sh" %(WORKDIR,dataset,i))
+        i+=1
 
 ###### create submit.sub file ####
 with open('%s/submit.sub' %(WORKDIR), 'w') as fout:

@@ -2,6 +2,7 @@ import os
 import uproot
 import torch
 from torch_geometric.data import Dataset, Data
+import awkward as ak
 import networkx as nx
 from operator import xor
 
@@ -10,210 +11,100 @@ from torch_geometric.utils.convert import to_networkx
 import numpy as np
 import matplotlib.pyplot as plt
 
+import yaml
 
-''' Auxliary functions and variables'''
-NUM_PROCESSORS = 3
-NUM_PHI_BINS = 5400
-HW_ETA_TO_ETA_FACTOR=0.010875
-LOGIC_LAYERS_LABEL_MAP={
-            #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
-            # Put here catalog of names0
-            0: 'MB1',
-            2: 'MB2',
-            4: 'MB3',
-            6: 'ME1/3',
-            7: 'ME2/2',
-            8: 'ME3/2',
-            9: 'ME1/2',
-            10: 'RB1in',
-            11: 'RB1out',
-            12: 'RB2in',
-            13: 'RB2out',
-            14: 'RB3',
-            15: 'RE1/3',
-            16: 'RE2/3',
-            17: 'RE3/3'
-        }
+from converter import get_stub_r, get_global_phi, HW_ETA_TO_ETA_FACTOR, getEdgesFromLogicLayer, remove_empty_or_nan_graphs
+from converter import getEdgesFromLogicLayer, get_layer_order
+''' Auxliary functions and variables move to some auxiliary file '''
 
-def get_global_phi(phi, processor):
-    p1phiLSB = 2 * np.pi / NUM_PHI_BINS
-    if isinstance(phi, list):
-        return [(processor * 192 + p + 600) % NUM_PHI_BINS * p1phiLSB for p in phi]
-    else:
-        return (processor * 192 + phi + 600) % NUM_PHI_BINS * p1phiLSB
+def add_stubCosPhi(arr, input_field, output_field):
+    # Aplica np.cos directamente sobre el arreglo awkwrd
+    stub_cos = np.cos(arr[input_field])
+    # Agrega el nuevo campo al array
+    arr = ak.with_field(arr, stub_cos, output_field)
+    return arr
 
+def add_stubSinPhi(arr, input_field, output_field):
+    # Aplica np.cos directamente sobre el arreglo awkwrd
+    stub_cos = np.sin(arr[input_field])
+    # Agrega el nuevo campo al array
+    arr = ak.with_field(arr, stub_cos, output_field)
+    return arr
 
-def get_stub_r(stubTypes, stubEta, stubLayer, stubQuality):
-    rs = []
-    for stubType, stubEta, stubLayer, stubQuality in zip(stubTypes, stubEta, stubLayer, stubQuality):
-        r = None
-        if stubType == 3:  # DTs
-            if stubLayer == 0:
-                r = 431.133
-            elif stubLayer == 2:
-                r = 512.401
-            elif stubLayer == 4:
-                r = 617.946
-
-            # Low-quality stubs are shifted by 23.5/2 cm
-            if stubQuality == 2 or stubQuality == 0:
-                r = r - 23.5 / 2
-            elif stubQuality == 3 or stubQuality == 1:
-                r = r + 23.5 / 2
-
-        elif stubType == 9:  # CSCs
-            if stubLayer == 6:
-                z = 690  # ME1/3
-            elif stubLayer == 9:
-                z = 700  # M1/2
-            elif stubLayer == 7:
-                z = 830
-            elif stubLayer == 8:
-                z = 930
-            r = z / np.cos(np.tan(2 * np.arctan(np.exp(-stubEta * HW_ETA_TO_ETA_FACTOR))))
-        elif stubType == 5:  # RPCs, but they will be shut down because they leak poisonous gas
-            r = 999.
-            if stubLayer == 10:
-                r = 413.675  # RB1in
-            elif stubLayer == 11:
-                r = 448.675  # RB1out
-            elif stubLayer == 12:
-                r = 494.975  # RB2in
-            elif stubLayer == 13:
-                r = 529.975  # RB2out
-            elif stubLayer == 14:
-                r = 602.150  # RB3
-            elif stubLayer == 15:
-                z = 720  # RE1/3
-            elif stubLayer == 16:
-                z = 790  # RE2/3
-            elif stubLayer == 17:
-                z = 970  # RE3/3
-            if r == 999.:
-                r = z / np.cos(np.tan(2 * np.arctan(np.exp(-stubEta * HW_ETA_TO_ETA_FACTOR))))
-
-        rs.append(r)
-
-    if len(rs) != len(stubTypes):
-        print('Tragic tragedy. R has len', len(rs), ', stubs have len', len(stubTypes))
-    return np.array(rs, dtype=object)
-    
-def getEtaKey(eta):
-    if abs(eta) < 0.92:
-        return 1
-    elif abs(eta) < 1.1:
-        return 2
-    elif abs(eta) < 1.15:
-        return 3
-    elif abs(eta) < 1.19:
-        return 4
-    else:
-        return 5
-    
-def getListOfConnectedLayers(eta):
-    etaKey=getEtaKey(eta)    
-
-    LAYER_ORDER_MAP = {
-            1: [10,0,11,12,2,13,14,4,6,15],
-            2: [10,0,11,12,2,13,6,15,16,7],
-            3: [10,0,11,6,15,16,7,8,17],
-            4: [10,0,11,16,7,8,17],
-            5: [10,0,9,16,7,8,17],
-    }
-    return LAYER_ORDER_MAP[etaKey]    
-
-def getEdgesFromLogicLayer(logicLayer,withRPC=True):
-    LOGIC_LAYERS_CONNECTION_MAP={
-            #(0,2), (2,4), (0,6), (2,6), (4,6), (6,7), (6,8), (0,7), (0,9), (9,7), (7,8)]
-            # Put here catalog of names0
-            0: [2,4,6,7,8,9],   #MB1: [MB2, MB3, ME1/3, ME2/2]
-            4: [6],             #MB3: [ME1/3]
-            2: [4,6,7],         #MB2: [MB3, ME1/3]
-            6: [7,8],           #ME1/3: [ME2/2]
-            7: [8,9],           #ME2/2: [ME3/2]
-            8: [9],             #ME3/2: [RE3/3]
-            9: [],              #ME1/2: [RE2/3, ME2/2]
-    }
-    LOGIC_LAYERS_CONNECTION_MAP_WITH_RPC = {
-            0:  [2,4,6,7,8,9,10,11,12,13,14,15,16,17], 
-            #1:  [2,4,6,7,8,9,10,11,12,13,14,15,16,17], 
-            2:  [4,6,7,10,11,12,13,14,15,16],       #MB2: [MB3, ME1/3]
-            #3:  [4,6,7,10,11,12,13,14,15,16],       #MB2: [MB3, ME1/3]
-            4:  [6,10,11,12,13,14,15],         #MB3: [ME1/3]
-            #5:  [6,10,11,12,13,14,15],         #MB3: [ME1/3]
-            6:  [7,8,10,11,12,13,14,15,16,17],         #ME1/3: [ME2/2]
-            7:  [8,9,10,11,15,16,17],         #ME2/2: [ME3/2]
-            8:  [9,10,11,15,16,17],        #ME3/2: [RE3/3]
-            9:  [7,10,16,17],         #ME1/2: [RE2/3, ME2/2]
-            10: [11,12,13,14,15,16,17],
-            11: [12,13,14,15,16,17],
-            12: [13,14,15,16],
-            13: [14,15,16],
-            14: [15],
-            15: [16,17],
-            16: [17],
-            17: []
-    }
-        
-    if (withRPC):
-        return (LOGIC_LAYERS_CONNECTION_MAP_WITH_RPC[logicLayer])
-    else:
-        if (logicLayer>=10): return []
-        return (LOGIC_LAYERS_CONNECTION_MAP[logicLayer])
-
-def remove_empty_or_nan_graphs(data):
-    # Verificar si el grafo está vacío
-    if data.x.size(0) == 0 or data.edge_index.size(1) == 0:
-        return None
-
-    # Verificar si hay valores nan en x, edge_attr o y
-    if torch.isnan(data.x).any() or (data.edge_attr is not None and torch.isnan(data.edge_attr).any()) or torch.isnan(data.y).any():
-        return None
-
-    return data
+def add_layer_order(arr, eta_field, layer_field, output_field):
+    """
+    Add the layer order to the array based on the eta and layer.
+    """
+    stub_eta   = np.abs(arr[eta_field])
+    stub_layer = np.abs(arr[layer_field])
+    arr = ak.with_field(arr, get_layer_order(stub_eta, stub_layer), output_field)
+    return arr
 
 class OMTFDataset(Dataset):
-    def __init__(self, root_dir=None, tree_name=None, muon_vars=None, stub_vars=None, transform=None, pre_transform=None, dataset=None, max_files=None, max_events=None):
+    def __init__(self, **kwargs):
         """
-        Args:
+        Los parámetros se pueden pasar como keyword arguments:
             root_dir (str): Directorio que contiene los archivos ROOT.
-            tree_name (str): Nombre del árbol dentro de los archivos ROOT.
-            muon_vars (list of str, optional): Lista de variables de muones a extraer.
-            stub_vars (list of str, optional): Lista de variables de stubs a extraer.
-            transform (callable, optional): Una función/transformación que toma un objeto Data y lo devuelve transformado.
-            pre_transform (callable, optional): Una función/transformación que se aplica antes de guardar los datos.
+            tree_name (str): Nombre del árbol (default: "simOmtfPhase2Digis/OMTFHitsTree").
+            muon_vars (list): Variables de muones a extraer.
+            stub_vars (list): Variables de stubs a extraer.
+            max_files (int): Número máximo de archivos a procesar.
+            max_events (int): Número máximo de eventos a procesar.
+            debug (bool): Modo debug.
+            pre_transform (callable): Función de pre-transformación.
+            transform (callable): Función de transformación (opcional).
         """
-        self.max_files = max_files if max_files is not None else None
-        self.max_events = max_events
-        if dataset is not None:
-            self.dataset = dataset
-        else:
-            self.root_dir = root_dir
-            self.tree_name = tree_name
-            self.muon_vars = muon_vars if muon_vars is not None else []
-            self.stub_vars = stub_vars if stub_vars is not None else []
-            self.pre_transform = pre_transform
-            self.dataset = self.load_data_from_root()
-        
-        self.transform = transform
+        config_file = kwargs.get("config")
+        if config_file is not None:
+            with open(config_file, "r") as f:
+                config = yaml.safe_load(f)
+            # Combinar: los parámetros ya presentes en kwargs toman prioridad.
+            for key, value in config.items():
+                print(f"Setting {key} from config file: {value}")
+                kwargs[key] = value
 
-    def add_extra_vars_to_tree(self, tree):
+        self.root_dir      = kwargs.get("root_dir")
+        self.tree_name     = kwargs.get("tree_name", "simOmtfPhase2Digis/OMTFHitsTree")
+        self.muon_vars     = kwargs.get("muon_vars", [])
+        self.omtf_vars     = kwargs.get("omtf_vars", [])
+        self.stub_vars     = kwargs.get("stub_vars", [])
+        self.target_vars   = kwargs.get("target_vars", [])
+        self.task          = kwargs.get("task", "regression")
+        self.max_files     = kwargs.get("max_files", None)  # None means no limit
+        self.max_events    = kwargs.get("max_events",None)
+        self.debug         = kwargs.get("debug", False)
+        self.pre_transform = kwargs.get("pre_transform")
+        self.transform     = kwargs.get("transform")
+
+        if "dataset" in kwargs and kwargs["dataset"] is not None:
+            self.dataset = kwargs["dataset"]
+        else:
+            self.dataset = self.load_data_from_root()
+
+    def add_extra_vars_to_tree(self, arr):
         """
         Add some extra variables....
         """
-        df = tree.arrays(library="pd")  # Convertir el árbol a un DataFrame de pandas
-        df = df[df.stubNo > 0]
-        if 'stubR' not in df.columns:
-            df['stubR'] = df.apply(lambda x: get_stub_r(x['stubType'], x['stubEta'], x['stubLayer'], x['stubQuality']), axis=1)
-        df['stubPhi'] = df['stubPhi'] + df['stubPhiB']
-        df['stubEtaG'] = df['stubEta'] * HW_ETA_TO_ETA_FACTOR
-        df = df[df.columns.drop(list(df.filter(regex='inputStub')))]
-        df['stubPhiG'] = df.apply(lambda x: get_global_phi(x['stubPhi'], x['omtfProcessor']), axis=1)
-        df['muonPropEta'] = df['muonPropEta'].abs()
-        df['muonQPt'] = df['muonCharge'] * df['muonPt']
-        df['muonQOverPt'] = df['muonCharge'] / df['muonPt']
+        if not hasattr(arr, "stubR"):
+            arr['stubR'] = get_stub_r(arr['stubType'], arr['stubEta'], arr['stubLayer'], arr['stubQuality'])
+        arr['stubEtaG'] = arr['stubEta'] * HW_ETA_TO_ETA_FACTOR
+        arr['stubPhiG'] = get_global_phi(arr['stubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
+        arr = add_stubCosPhi(arr, 'stubPhiG', 'stubCosPhi')
+        arr = add_stubSinPhi(arr, 'stubPhiG', 'stubSinPhi')
+        #arr = add_layer_order(arr, 'stubEtaG', 'stubLayer', 'stubLayerOrder')
 
-        return df
+        if not hasattr(arr, "inputStubR"):
+            arr['inputStubR'] = get_stub_r(arr['inputStubType'], arr['inputStubEta'], arr['inputStubLayer'], arr['inputStubQuality'])
+        arr['inputStubEtaG'] = arr['inputStubEta'] * HW_ETA_TO_ETA_FACTOR
+        arr['inputStubPhiG'] = get_global_phi(arr['inputStubPhi'], arr['omtfProcessor'])  ## need to check this value!! (not sure it is OK)
+        arr = add_stubCosPhi(arr, 'inputStubPhiG', 'inputStubCosPhi')
+        arr = add_stubSinPhi(arr, 'inputStubPhiG', 'inputStubSinPhi')
+        #arr = add_layer_order(arr, 'inputStubEtaG', 'inputStubLayer', 'inputStubLayerOrder')
+
+        arr['muonQPt'] = arr['muonCharge'] * arr['muonPt']
+        arr['muonQOverPt'] = arr['muonCharge'] / arr['muonPt']
+        
+        return arr
     
     def load_data_from_root(self):
         data_list = []
@@ -229,54 +120,56 @@ class OMTFDataset(Dataset):
             raise ValueError(f"{self.root_dir} is not a valid directory or ROOT file")
 
         for root_file in root_files:
+            print(f"Processing file: {root_file}")
             if self.max_files is not None and files_processed >= self.max_files:
                 break
+            
+            file = uproot.open(root_file)
+            tree = file[self.tree_name]
+            arr = tree.arrays(library="ak")
+            
+            arr = self.add_extra_vars_to_tree(arr)
 
-            with uproot.open(root_file) as file:
-                tree = file[self.tree_name]
+            for event in ak.to_list(arr):
+                if events_processed % 500 == 0:
+                    print(f"Processed {events_processed} events")
+                if self.max_events is not None and events_processed >= self.max_events:
+                    break
+                events_processed += 1
+
                 # drop the event if it has no stubs
+                if (event['stubNo']) == 0 or (event['inputStubNo']) == 0:
+                    continue
+               
+
+                # Now create nodes and edges: 
+                node_features = torch.tensor([event[st] for st in self.stub_vars], dtype=torch.float32).transpose(0,1)
+                target_tensor = torch.tensor([event[st] for st in self.target_vars], dtype=torch.float32)
+                if target_tensor.dim() == 2:
+                    target_features = target_tensor.transpose(0, 1)
+                else:
+                    target_features = target_tensor
                 
-                df = self.add_extra_vars_to_tree(tree)
+                if self.task == 'classification':
+                    edge_index, edge_attr, edge_label = self.create_edges(event, 'inputStub')
+                     #target_features = None               
+                elif self.task == 'regression':
+                    edge_index, edge_attr, edge_label = self.create_edges(event)               
 
-                for index, row in df.iterrows():
-                    if events_processed % 100 == 0:
-                        print(f"Processed {events_processed} events")
-                    if self.max_events is not None and events_processed >= self.max_events:
-                        break
-                    layers=row['stubLayer']
-                    stub_phi=row['stubPhi']
-                    stub_phiB=row['stubPhiB']
-                    
-                    for layerL in [1,3,5]:
-                        try:
-                            row['stubLayer'].index(layerL)
-                        except ValueError:
-                            continue
-                        else:
-                            indexL=row['stubLayer'].index(layerL)
-                            layersLen=len(row['stubLayer'])
-                            row['stubNo']=row['stubNo']-1
-                            for column in df.columns.values.tolist():
-                                if "stub" in column and column!='stubNo':
-                                    if len(row[column])==layersLen:
-                                        row[column].pop(indexL)                            
-                            #index2=layers.index(layerL)                            
-                            #index1=index2-1
-                            #print(f'Entry {index}: Layers {layerL-1} - {layerL}   Phi{layerL}: {stub_phi[index1]}  Phi{layerL+1}: {stub_phi[index2]}   PhiB{layerL}: {stub_phiB[index1]}  PhiB{layerL+1}: {stub_phiB[index2]}   DeltaPhi {stub_phi[index1]-stub_phi[index2]}     DeltaPhiB {stub_phiB[index1]-stub_phiB[index2]}')
-                         
-                    # Create nodes and edges
-                    stub_array = np.vstack([row[var] for var in self.stub_vars]).astype(np.float32).T
-                    x = torch.tensor(stub_array, dtype=torch.float)
-                    edge_index, edge_attr = self.create_edges(row)
+                data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=target_features, edge_label=edge_label, dtype=torch.float)
 
-                    data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=torch.tensor([row[var] for var in self.muon_vars], dtype=torch.float))
-                    if self.pre_transform is not None:
-                        data = self.pre_transform(data)
-                    if data is not None:
-                        data_list.append(data)
-                    events_processed += 1
+                # Add extra features to the data object
+                data.muon_vars = torch.tensor([event[var] for var in self.muon_vars], dtype=torch.float)
+                data.omtf_vars = torch.tensor([event[var] for var in self.omtf_vars], dtype=torch.float)
+                
+                if self.pre_transform is not None:
+                    # Apply pre-transformations to the data
+                    data = self.pre_transform(data)
+                if data is not None:
+                    data_list.append(data)
 
             files_processed += 1
+        
         return data_list
 
     def getDeltaPhi(self,phi1,phi2):
@@ -287,12 +180,21 @@ class OMTFDataset(Dataset):
     def getDeltaEta(self,eta1,eta2):
         return eta1-eta2
     
-    def create_edges(self, row):
-        stubLayer = row['stubLayer']
-        stubPhi = row['stubPhi']
-        stubEta = row['stubEta']
+    def getDeltaR(self, r1, r2):
+        """
+        Calculate the delta R between two points 
+        """
+        return r1 - r2
+    
+    def create_edges(self, row, stubName='stub'):
+        stubLayer = row['%sLayer' % stubName]
+        stubPhi = row['%sPhi' % stubName]
+        stubEta = row['%sEta' % stubName]
+        stubR = row['%sR' % stubName]
+        stubIsMatched = row['%sIsMatched' % stubName] if '%sIsMatched' % stubName in row else None
         edge_index = []
         edge_attr = []
+        edge_label = []  # This is only used for classification tasks, so it can be empty for regression tasks
         for stub1Id,stub1Layer in enumerate(stubLayer):
             for stub2Id, stub2Layer in enumerate(stubLayer):
                 #print(f'stubt1Id:{stub1Id}   stub1Layer:{stub1Layer}    stubt2Id:{stub2Id}   stub2Layer:{stub2Layer}')
@@ -300,11 +202,13 @@ class OMTFDataset(Dataset):
                 if stub2Layer in getEdgesFromLogicLayer(stub1Layer):
                     dphi = self.getDeltaPhi(stubPhi[stub1Id],stubPhi[stub2Id])
                     deta = self.getDeltaEta(stubEta[stub1Id],stubEta[stub2Id])
+                    dr   = self.getDeltaR(stubR[stub1Id], stubR[stub2Id])
                     edge_index.append([stub1Id, stub2Id])
-                    edge_attr.append([dphi, deta])
+                    edge_attr.append([dphi, deta, dr])
+                    edge_label.append(int(stubIsMatched[stub1Id] and stubIsMatched[stub2Id]) if stubIsMatched is not None else 0)
         edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         edge_attr = torch.tensor(edge_attr, dtype=torch.float)
-        return edge_index, edge_attr
+        return edge_index, edge_attr, edge_label
 
     def len(self):
         return len(self.dataset)
@@ -415,39 +319,41 @@ class OMTFDataset(Dataset):
 
     @staticmethod
     def load_dataset(file_path):
-        dataset = torch.load(file_path)
+        dataset = torch.load(file_path, weights_only=False)
         print(f"Dataset cargado desde {file_path}")
         return OMTFDataset(dataset=dataset)
 
 def main():
     import argparse
-    from torch_geometric.data import DataLoader
+    from torch_geometric.loader import DataLoader
 
     parser = argparse.ArgumentParser(description="Load ROOT files and create a PyTorch Geometric dataset")
+    parser.add_argument('--config', type=str, help='Path to the configuration file with parameters')
     parser.add_argument('--root_dir', type=str, required=True, help='Directory containing the ROOT files')
     parser.add_argument('--tree_name', type=str, default="simOmtfPhase2Digis/OMTFHitsTree", help='Name of the tree inside the ROOT files')
-    parser.add_argument('--muon_vars', nargs='+', type=str, required=True, help='List of muon variables to extract')
-    parser.add_argument('--stub_vars', nargs='+', type=str, required=True, help='List of stub variables to extract')
+    parser.add_argument('--muon_vars', nargs='+', type=str, help='List of muon variables to extract')
+    parser.add_argument('--omtf_vars', nargs='+', type=str, help='List of OMTF variables to extract')
+    parser.add_argument('--stub_vars', nargs='+', type=str, help='List of stub variables to extract')
+    parser.add_argument('--task', type=str, default='regression', help='Task type (classification or regression)')
     parser.add_argument('--plot_example', action='store_true', help='Plot an example graph')
     parser.add_argument('--save_path', type=str, help='Path to save the dataset')
     parser.add_argument('--load_path', type=str, help='Path to load the dataset')
     parser.add_argument('--max_files', type=int, help='Maximum number of files to process')
     parser.add_argument('--max_events', type=int, help='Maximum number of events to process')
-
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
     if args.load_path:
         dataset = OMTFDataset.load_dataset(args.load_path)
     else:
         pre_transformation = remove_empty_or_nan_graphs
-        dataset = OMTFDataset(root_dir=args.root_dir, pre_transform=pre_transformation, tree_name=args.tree_name, muon_vars=args.muon_vars, stub_vars=args.stub_vars, max_files=args.max_files, max_events=args.max_events)
+        dataset = OMTFDataset(pre_transform=pre_transformation, **vars(args))
+
         if args.save_path:
             dataset.save_dataset(args.save_path)
 
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
-    for data in dataloader:
-        print(data)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     if args.plot_example:
         dataset.plot_example_graph(index=0, num_nodes=5)

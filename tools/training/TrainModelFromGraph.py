@@ -1,18 +1,15 @@
 import torch
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import Compose
-from torch_geometric.data import Data
 
 import os,sys
 
 import argparse
 import matplotlib.pyplot as plt
-from models import GATRegressor, GraphSAGEModel, MPLNNRegressor, GCNRegressor
+from models import GATRegressor, GraphSAGEModel, MPLNNRegressor, GCNRegressor, GCNNodeClassifier
 from transformations import DropLastTwoNodeFeatures,NormalizeNodeFeatures,NormalizeEdgeFeatures,NormalizeTargets
-import pickle
 
-import itertools
-
+import yaml
 
 class TrainModelFromGraph:
     @staticmethod
@@ -33,9 +30,21 @@ class TrainModelFromGraph:
         parser.add_argument('--normalization', type=str, default='NodesAndEdgesAndOnlySpatial', help='Type of normalization to apply')
         parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
         parser.add_argument('--device', type=str, default='cuda', help='Device to use for training')
+        parser.add_argument('--task', type=str, default='regression', help='Task to perform: regression or classification')
         return parser
 
     def __init__(self, **kwargs):
+
+        config_file = kwargs.get("config")
+        if config_file is not None:
+            with open(config_file, "r") as f:
+                config = yaml.safe_load(f)
+            # Combinar: los parámetros ya presentes en kwargs toman prioridad.
+            for key, value in config.items():
+                print(f"Setting {key} from config file: {value}")
+                kwargs[key] = value
+
+
         self.graph_path = kwargs.get('graph_path', 'graph_folder')
         self.graph_name = kwargs.get('graph_name', 'vix_graph_13Nov_3_muonQOverPt')
         self.out_model_path = kwargs.get('out_model_path', 'Bsize_gmp_64_lr5e-4_v3')
@@ -44,14 +53,15 @@ class TrainModelFromGraph:
         self.learning_rate = kwargs.get('learning_rate', 0.001)
         self.epochs = kwargs.get('epochs', 100)
         self.earlystop = kwargs.get('earlystop', 3)
-        self.model_path = kwargs.get('model_path', None)
         self.do_validation = kwargs.get('evaluate', False)
         self.do_train = kwargs.get('do_train', False)
         self.hidden_dim = kwargs.get('hidden_dim', 32)
-        self.model_type = kwargs.get('model_type', 'SAGE')
+        self.model_type = kwargs.get('model_type', 'SAGE')         
+        self.model_path = kwargs.get('model_path', f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{self.epochs}epochs_{self.save_tag}.pth") 
         self.normalization = kwargs.get('normalization', 'NodesAndEdgesAndOnlySpatial')
         self.num_files = kwargs.get('num_files', None)  # Número de archivos a cargar
         self.device = kwargs.get('device', 'cuda')
+        self.task = kwargs.get('task', 'regression')  # Default task is regression
         
         # Initialize other attributes
         self.train_loader = None
@@ -114,13 +124,49 @@ class TrainModelFromGraph:
     def set_device(self, device):
         self.device = device
     
+    ## Getters for all parameters:
+    def get_graph_path(self):
+        return self.graph_path
+    def get_graph_name(self):
+        return self.graph_name
+    def get_out_model_path(self):
+        return self.out_model_path
+    def get_save_tag(self):
+        return self.save_tag
+    def get_batch_size(self):
+        return self.batch_size
+    def get_learning_rate(self):
+        return self.learning_rate
+    def get_epochs(self):
+        return self.epochs
+    def get_model_path(self):
+        return self.model_path
+    def get_do_validation(self):
+        return self.do_validation
+    def get_do_train(self):
+        return self.do_train
+    def get_hidden_dim(self):
+        return self.hidden_dim
+    def get_model_type(self):
+        return self.model_type
+    def get_normalization(self):
+        return self.normalization
+    def get_num_files(self):
+        return self.num_files
+    def get_device(self):
+        return self.device
+    def get_task(self):
+        return self.task  
+
+
     def load_data(self):
         # Loading data from graph and convert it to DataLoader
         graphs = []
         all_files = os.listdir(self.graph_path)
-
         # Filter for .pkl files
         graph_files = [f for f in all_files if (f.endswith('.pkl') or f.endswith('.pt')) and self.graph_name in f]
+        print(f"Found {len(graph_files)} graph files matching '{self.graph_name}' in {self.graph_path}") 
+
         if not graph_files:
             print("No .pkl/.pt files found in the directory.")
             return []
@@ -149,9 +195,9 @@ class TrainModelFromGraph:
         ]
 
         # remove extra dimension in y and put deltaPhi and deltaEta in the data object as edge_attr
-        for i in range(0, len(Graphs_for_training_filtered)):
-            Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
-            Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)        
+        #for i in range(0, len(Graphs_for_training_filtered)):
+        #    Graphs_for_training_filtered[i].y = Graphs_for_training_filtered[i].y.mean(dim=0)
+            #Graphs_for_training_filtered[i].edge_attr = torch.stack([Graphs_for_training_filtered[i].deltaPhi.float(), Graphs_for_training_filtered[i].deltaEta.float()], dim=1)        
 
 
         Graphs_for_training_filtered = [
@@ -164,6 +210,7 @@ class TrainModelFromGraph:
 
         # Apply transformations to the load data... 
         if self.transform is not None:
+            print(f"Applying transformations: {self.transform}")
             Graphs_for_training_filtered = [self.transform(data) for data in Graphs_for_training_filtered]
 
         Graphs_for_training_filtered = [
@@ -194,20 +241,36 @@ class TrainModelFromGraph:
     def initialize_model(self):
         num_node_features = 3
         hidden_dim = self.hidden_dim
-        output_dim = 1 ## ONE FEATURE ONLY!!!
+        if self.task == 'classification':
+            output_dim = 1  # For classification, we use 2 output features (logits for binary classification)
+        else:
+            # For regression, we use 1 output feature
+            print("Using regression task")
+            output_dim = 1 ## ONE FEATURE ONLY!!!
+        
         print(f"Using device: {self.device}")
-        if self.model_type == 'GAT':
+
+        if self.model_type == 'GAT' and self.task == 'regression':
             self.model = GATRegressor(num_node_features=num_node_features, hidden_dim=hidden_dim, output_dim=output_dim).to(self.device)
-        elif self.model_type == 'SAGE':
+        elif self.model_type == 'SAGE' and self.task == 'regression':
             self.model = GraphSAGEModel(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
-        elif self.model_type == 'MPNN':
+        elif self.model_type == 'MPNN' and self.task == 'regression':
             self.model = MPLNNRegressor(in_channels=num_node_features).to(self.device)
-        elif self.model_type == 'GCN':
+        elif self.model_type == 'GCN' and self.task == 'regression':
             self.model = GCNRegressor(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
+        elif self.model_type == 'GCN' and self.task == 'classification':
+            print("Using GCN for classification task")
+            self.model = GCNNodeClassifier(in_channels=num_node_features, hidden_channels=hidden_dim, out_channels=output_dim).to(self.device)
         #self.model = torch_geometric.compile(self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self.loss_fn = torch.nn.MSELoss()
 
+        if self.task == 'classification':
+            self.loss_fn = torch.nn.BCEWithLogitsLoss()
+        elif self.task == 'regression':
+            # For regression, we use MSE loss
+            print("Using MSE loss for regression task")
+            self.loss_fn = torch.nn.MSELoss()
+        
         print("Model initialized")
         print(self.model)
 
@@ -218,7 +281,11 @@ class TrainModelFromGraph:
             data = data.to(self.device)  # Move data to the device
             self.optimizer.zero_grad()
             out = self.model(data)
-            loss = self.loss_fn(out, data.y.view(out.size()))
+            if self.task == 'classification':
+                # For BCEWithLogitsLoss, targets should be float and same shape as output
+                loss = self.loss_fn(out, data.y.float())
+            else:
+                loss = self.loss_fn(out, data.y.view(out.size()))
             loss.backward()
             self.optimizer.step()
             total_loss += loss.item()
@@ -233,7 +300,11 @@ class TrainModelFromGraph:
         for data in loader:
             data = data.to(self.device)
             out = self.model(data)
-            loss = self.loss_fn(out, data.y.view(out.size()))
+            if self.task == 'classification':
+                # For BCEWithLogitsLoss, targets should be float and same shape as output
+                loss = self.loss_fn(out, data.y.float())
+            else:
+                loss = self.loss_fn(out, data.y.view(out.size()))
             total_loss += loss.item()
         return total_loss / len(loader)
 
@@ -248,6 +319,7 @@ class TrainModelFromGraph:
         best_epoch = int(0)
         counter = int(0)
         
+        print(f'Window for early stopping: {window} epochs')
         print("Start training...")
         for epoch in range(self.epochs):
             train_loss = self.train_model(self.train_loader)
@@ -257,10 +329,11 @@ class TrainModelFromGraph:
             if test_loss < best_loss: #found better loss
                 best_loss = test_loss
                 best_epoch = epoch
-                counter = 0
                 print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}')
                 torch.save(self.model.state_dict(), f"{self.out_model_path}/model_{self.model_type}_{self.hidden_dim}dim_{self.epochs}epochs_{self.save_tag}.pth")
+                counter = 0 #
             else:
+                print(f'Epoch: {epoch + 1:02d}, Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f} (no improvement)')
                 counter += 1 #increment counter
 
             #Stop training if more than X epochs have passed without improvements to the test loss
@@ -276,6 +349,9 @@ class TrainModelFromGraph:
         print(f"Loading model from {self.model_path}")
         # load the model, first try state_dict then the model itself
         try:
+            print("Loading state_dict")
+            print(self.model_path)
+            print(self.device)
             self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
         except:
             self.model = torch.load(self.model_path, map_location=self.device)
@@ -283,6 +359,7 @@ class TrainModelFromGraph:
 def main():
 
     parser = argparse.ArgumentParser(description="Train and evaluate GNN model")
+    parser.add_argument('--config', type=str, help='Path to the configuration file with parameters')
     parser.add_argument('--graph_path', type=str, default='graph_folder', help='Path to the graph data')
     parser.add_argument('--graph_name', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Name of the graph data')
     parser.add_argument('--save_tag', type=str, default='vix_graph_13Nov_3_muonQOverPt', help='Tag for saving the model')
@@ -295,12 +372,13 @@ def main():
     parser.add_argument('--num_files', type=int, default=None, help='Number of graph files to load')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for training')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for training')
-    parser.add_argument('--earlystop', type=int, default=3, help='Number of epochs before closing the training if there is no improvement in the loss')
+    parser.add_argument('--earlystop', type=int, default=10, help='Number of epochs before closing the training if there is no improvement in the loss')
     parser.add_argument('--model_path', type=str, default='Bsize_gmp_64_lr5e-4_v3/model_1000.pth', help='Path to the saved model for evaluation')
     parser.add_argument('--output_dir', type=str, default='Bsize_gmp_64_lr5e-4_v3', help='Output directory for evaluation results')
     parser.add_argument('--do_train', action='store_true', help='Train the model')
     parser.add_argument('--do_validation', action='store_true', help='Evaluate the model')
     parser.add_argument('--device', type=str, default='cuda', help='Device to use for training')
+    parser.add_argument('--task', type=str, default='regression', help='Task to perform: regression or classification')
 
     args = parser.parse_args()
 
@@ -309,19 +387,27 @@ def main():
     trainer.load_data()
     trainer.initialize_model()
 
-    if args.plot_graph_features: 
-        from validation import plot_graph_feature_histograms
-        plot_graph_feature_histograms(trainer.train_loader, output_dir=args.output_dir,label=trainer.save_tag)
+    if trainer.get_plot_graph_features:
+        print("Plotting graph features...")
+        from validation import plot_graph_features
+        print("Plotting graph features for task :", trainer.get_task())
+        plot_graph_features(trainer.train_loader, output_dir=args.output_dir,label=args.save_tag, task=trainer.get_task())
 
     if args.do_train:
         trainer.Training_loop()
 
     if args.do_validation:
         trainer.load_trained_model()
-        from validation import plot_prediction_results, evaluate_model
-        regression,prediction = evaluate_model(trainer.model, trainer.test_loader, trainer.device)
-        plot_prediction_results(regression, prediction, output_dir=args.output_dir,model=trainer.model_type, label=trainer.save_tag)
-
+        if trainer.get_task() == 'regression':
+            from validation import plot_prediction_results, evaluate_model
+            print("Evaluating model for regression task")
+            regression,prediction = evaluate_model(trainer.model, trainer.test_loader, trainer.device)
+            plot_prediction_results(regression, prediction, output_dir=args.output_dir,model=trainer.model_type, label=trainer.save_tag)
+        elif trainer.get_task() == 'classification':
+            from validation import plot_prediction_results_classification, evaluate_classification_model
+            print("Evaluating model for classification task")
+            classification, prediction = evaluate_classification_model(trainer.model, trainer.test_loader, trainer.device)
+            plot_prediction_results_classification(classification, prediction, output_dir=args.output_dir, model=trainer.model_type, label=trainer.save_tag)
 
 if __name__ == "__main__":
     main()

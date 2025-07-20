@@ -1,6 +1,6 @@
 tree_vars = [
     'eventNum', 'muonEvent', 'muonPt', 'muonEta', 'muonPhi', 'muonPropEta',
-    'muonPropPhi', 'muonCharge', 'muonDxy', 'muonRho', 'omtfPt', 'omtfUPt',
+    'muonPropPhi', 'muonCharge', 'muonDxy', 'muonRho','muonQPt','muonQOverPt','omtfPt', 'omtfUPt',
     'omtfEta', 'omtfPhi', 'omtfCharge', 'omtfHwEta', 'omtfProcessor',
     'omtfScore', 'omtfQuality', 'omtfRefLayer', 'omtfRefHitNum',
     'omtfFiredLayers', 'stubNo', 'stubLayer', 'stubQuality',
@@ -16,6 +16,7 @@ tree_vars = [
 # Crear configuración de plots para cada variable con configuraciones básicas
 plots = {}
 for var in tree_vars:
+    
     plots[var] = {
         'variable'   : var,
         'bins'       : 100,                   # Puedes ajustar o implementar lógica para diferentes binning
