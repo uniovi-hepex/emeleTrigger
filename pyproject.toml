@@ -25,7 +25,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.11.0"
+python = "^3.11.0"
 awkward = "2.5.2"
 matplotlib = "3.8.2"
 numpy = "1.23.4"

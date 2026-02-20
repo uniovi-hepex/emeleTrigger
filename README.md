@@ -13,7 +13,158 @@ If you have python 3.11 already installed in your system, you can also run `pyth
 source /cvmfs/sft.cern.ch/lcg/views/LCG_106_cuda/x86_64-el9-gcc11-opt/setup.sh
 ```
 
-## Graph / Dataset creation (please ignore it for now)
+## L1Nano Dataset Generation and Inspection
+
+### Overview
+
+The `L1NanoDataset` class processes L1 Trigger NanoAOD ROOT files and converts them into PyTorch Geometric graph datasets suitable for GNN training. Each event is converted into one or more graphs representing the stub-muon matching problem.
+
+### Quick Start
+
+#### 1. Generate a Dataset from L1Nano ROOT Files
+
+Use the provided shell script to convert ROOT files into a `.pt` dataset:
+
+```bash
+cd /Users/folgueras/cernbox/L1T/2025_09_GNN_L1Nano/CMSSW_15_1_0_pre6/src/emeleTrigger
+./tools/training/run_l1nano_save_dataset.sh <root_file_pattern> <max_events> <max_files> <output_path>
+```
+
+**Example:**
+```bash
+./tools/training/run_l1nano_save_dataset.sh \
+  "/Users/folgueras/cernbox/L1T/2025_09_GNN_L1Nano/CMSSW_15_1_0_pre6/src/HTo2LongLivedTo4mu_*.root" \
+  5000 \
+  1 \
+  l1nano_dataset_5k.pt
+```
+
+**Parameters:**
+- `<root_file_pattern>`: Glob pattern or path to ROOT file(s)
+- `<max_events>`: Maximum events to process per file (`-1` for all events)
+- `<max_files>`: Maximum number of files to process
+- `<output_path>`: Path where the `.pt` dataset will be saved
+
+The script processes events with a progress bar and saves the dataset in PyTorch Geometric format.
+
+#### 2. Inspect the Generated Dataset
+
+Use the inspection script to validate dataset quality and visualize examples:
+
+```bash
+./tools/training/run_inspect_dataset.sh <dataset_path> <num_examples> <output_prefix>
+```
+
+**Example:**
+```bash
+./tools/training/run_inspect_dataset.sh \
+  l1nano_dataset_5k.pt \
+  6 \
+  inspection
+```
+
+**Parameters:**
+- `<dataset_path>`: Path to the `.pt` dataset file
+- `<num_examples>`: Number of example graphs to plot (default: 6)
+- `<output_prefix>`: Prefix for output PNG files (default: "inspection")
+
+**Outputs:**
+- `<output_prefix>_example_graphs.png`: Visualization of example graphs with hierarchical layout by tfLayer
+- `<output_prefix>_feature_distributions.png`: Histograms of node features, edge features, and labels
+- Console output with dataset statistics (number of graphs, avg nodes/edges, feature dimensions)
+
+#### 3. Advanced Usage: Direct Python Interface
+
+For more control, you can use the Python classes directly:
+
+**Generate Dataset:**
+```python
+from tools.training.InputDataset import L1NanoDataset
+
+dataset = L1NanoDataset(
+    root_dir="/path/to/root/files/*.root",
+    max_events=1000,
+    max_files=1,
+    debug=True  # Shows progress bar
+)
+
+# Save dataset
+import torch
+torch.save(dataset, "my_l1nano_dataset.pt")
+```
+
+**Inspect Dataset:**
+```python
+from tools.training.inspect_dataset import print_dataset_summary, plot_example_graphs, plot_feature_distributions
+import torch
+
+dataset = torch.load("my_l1nano_dataset.pt")
+
+# Print statistics
+print_dataset_summary(dataset)
+
+# Plot example graphs
+plot_example_graphs(dataset, num_examples=6, output_file="graphs.png")
+
+# Plot feature distributions
+plot_feature_distributions(dataset, output_file="features.png")
+```
+
+#### 4. Visualize Individual Events (Debug Mode)
+
+To inspect a single event with detailed stub/edge information:
+
+```bash
+./tools/training/run_l1nano_visualization.sh
+```
+
+This script processes one event and creates:
+- `stub_and_edge_info_event_0.png`: Distribution plots for stub features and edge attributes
+- `graph_event_0.png`: Graph visualization for the first event
+
+### Dataset Structure
+
+Each graph in the dataset is a `torch_geometric.data.Data` object with:
+
+| Attribute | Shape | Description |
+|-----------|-------|-------------|
+| `x` | `[N, 3]` | Node features: `[tfLayer, offeta1, offphi1]` |
+| `edge_index` | `[2, E]` | Edge connectivity (COO format) |
+| `edge_attr` | `[E, 2]` | Edge features: `[Δη, Δφ]` between connected stubs |
+| `y` | `[N]` | Node labels: `1` (matched to muon), `0` (unmatched) |
+| `edge_y` | `[E]` | Edge labels: `1` (both nodes matched to same muon), `0` (otherwise) |
+| `matched_muon_idx` | `[N]` | Index of matched GenPart muon (`-1` if unmatched) |
+| `stub_deltaR` | `[N]` | ΔR distance to matched muon (`-1` if unmatched) |
+| `genpart_features` | `[M, 6]` | GenPart muon features: `[pt, etaSt2, phiSt2, charge, pdgId, statusFlags]` |
+
+**Matching Logic:**
+- Uses propagated GenPart muons to MB2 station (`GenPart_etaSt2`, `GenPart_phiSt2`)
+- Filters: `|pdgId| == 13`, `statusFlags` bit 13 set, `pt > 1 GeV`, `etaSt2 > -999`
+- Matching threshold: ΔR < 0.3
+
+**Edge Construction:**
+- Connects stubs in consecutive `tfLayer` values
+- Rectangular cuts: `|Δη| < 0.5`, `|Δφ| < 1.0`
+- Fallback: if no match in next layer, tries next-next layer
+
+### Troubleshooting
+
+**Import Errors:**
+Make sure you're in the conda environment with all dependencies:
+```bash
+conda activate cmsl1t
+```
+
+**ROOT File Not Found:**
+Verify the file path and that the ROOT file contains the required branches:
+```bash
+python -c "import uproot; print(uproot.open('file.root')['Events'].keys())"
+```
+
+**Empty Dataset:**
+Check that events have both stubs and matched GenPart muons. Use `--debug` flag to see detailed progress.
+
+## Graph / Dataset creation (OMTF - please ignore it for now)
 
 An example of its utilization can be seen in `test/test_omtf_dataset.py` or you can also run it interactively: 
 
